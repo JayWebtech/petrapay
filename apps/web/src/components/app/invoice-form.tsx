@@ -13,14 +13,12 @@ import { useToast } from "@/components/app/toaster";
 import { StatefulButton, type ButtonState } from "@/components/motion/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
 import { api, errorMessage } from "@/lib/api";
-import { sealBillTo } from "@/lib/share-key";
 import { cn } from "@/lib/utils";
 
 type Line = { key: number; description: string; quantity: string; unitAmount: string };
 
 let lineKey = 1;
 const newLine = (l: Partial<Omit<Line, "key">> = {}): Line => ({ key: lineKey++, description: "", quantity: "1", unitAmount: "", ...l });
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** yyyy-mm-dd in local time, for <input type="date">. */
 function toDateInput(iso: string | null): string {
@@ -55,21 +53,16 @@ export function editBlocker(invoice: InvoiceDTO): string | null {
 export type InvoiceFormProps = {
   /** Present when editing. */
   invoice?: InvoiceDTO;
-  /** Decrypted client details and share key of the invoice being edited. */
-  client?: { name?: string; email?: string };
-  shareKey?: string | null;
-  /** The invoice has client details this device can't decrypt; leaving the fields empty keeps them. */
-  clientLocked?: boolean;
 };
 
-export function InvoiceForm({ invoice, client, shareKey = null, clientLocked = false }: InvoiceFormProps) {
+export function InvoiceForm({ invoice }: InvoiceFormProps) {
   const router = useRouter();
   const toast = useToast();
   const { me, refresh } = useAuth();
   const editing = !!invoice;
   const [title, setTitle] = useState(invoice?.title ?? "");
-  const [clientName, setClientName] = useState(client?.name ?? "");
-  const [clientEmail, setClientEmail] = useState(client?.email ?? "");
+  const [clientName, setClientName] = useState(invoice?.clientName ?? "");
+  const [clientEmail, setClientEmail] = useState(invoice?.clientEmail ?? "");
   const [description, setDescription] = useState(invoice?.description ?? "");
   const [currency, setCurrency] = useState<"USD" | "ZEC">(invoice?.currency ?? "USD");
   const [dueDate, setDueDate] = useState(toDateInput(invoice?.dueDate ?? null));
@@ -90,43 +83,28 @@ export function InvoiceForm({ invoice, client, shareKey = null, clientLocked = f
     () =>
       createInvoiceSchema.safeParse({
         title,
+        clientName,
+        clientEmail,
         description: description || undefined,
         currency,
         dueDate: dueDate ? new Date(`${dueDate}T23:59:59`).toISOString() : undefined,
         lineItems: lines.map((l) => ({ description: l.description, quantity: Number(l.quantity), unitAmount: l.unitAmount.trim() })),
       }),
-    [title, description, currency, dueDate, lines],
+    [title, clientName, clientEmail, description, currency, dueDate, lines],
   );
 
   const errors = useMemo(() => {
     const next: Record<string, string> = {};
     if (!attempted) return next;
     if (!parsed.success) for (const issue of parsed.error.issues) next[issue.path.join(".")] ??= issue.message;
-    if (clientEmail.trim() && !EMAIL.test(clientEmail.trim())) next.clientEmail = "Enter a valid email address";
     return next;
-  }, [attempted, parsed, clientEmail]);
+  }, [attempted, parsed]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setAttempted(true);
-    if (!parsed.success || (clientEmail.trim() && !EMAIL.test(clientEmail.trim()))) return;
-
+    if (!parsed.success) return;
     const data: UpdateInvoiceInput = { ...parsed.data, dueDate: parsed.data.dueDate ?? null };
-    const name = clientName.trim();
-    const email = clientEmail.trim();
-    if (name || email) {
-      // Sealed on this device. Reusing the invoice's key keeps links you've already sent working.
-      const sealed = await sealBillTo({ name, email }, shareKey);
-      if (!sealed) {
-        toast.error("Can't encrypt client details", "Sign out, then sign back in with your recovery phrase to set up encryption on this device.");
-        return;
-      }
-      data.billTo = sealed.billTo;
-      data.billToKey = sealed.billToKey;
-    } else if (editing && !clientLocked) {
-      data.billTo = null;
-      data.billToKey = null;
-    }
 
     setState("loading");
     try {
@@ -179,12 +157,7 @@ export function InvoiceForm({ invoice, client, shareKey = null, clientLocked = f
                 autoComplete="off"
               />
             </div>
-            <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
-              <Lock className="mt-0.5 size-3 shrink-0 text-primary" />
-              {clientLocked
-                ? "This invoice has client details this device can't decrypt. Leave these empty to keep them, or enter new ones to replace them."
-                : "Shown on the invoice to anyone with its link. Encrypted in your browser, so PetraPay can't read it."}
-            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Optional. Shown on the invoice your client sees.</p>
           </div>
           <div>
             <FieldLabel htmlFor="notes">Notes for your client</FieldLabel>

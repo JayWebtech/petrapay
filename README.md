@@ -14,7 +14,8 @@ Client wallet ──(USDC on Base)──▶ 1Click deposit address ──▶ NEA
 **Creators**
 - Account = an ed25519 key derived from a 12-word recovery phrase. No email, password, or wallet linkage. The key lives in the browser as a non-extractable WebCrypto key.
 - **Shielded address pool.** Paste unified addresses from Zashi. Each invoice takes a fresh one, so the payments NEAR Intents' public explorer shows can't be linked to each other.
-- Invoices in USD or ZEC with line items, due dates, notes and a shareable link + QR.
+- Invoices in USD or ZEC with line items, due dates, notes and a shareable link + QR. Open invoices can be edited; the total is frozen while a client holds a live quote for it.
+- **Bill to:** optional client name and email, shown on the payment page. "Email invoice" opens the creator's own mail app with the link.
 - **End-to-end encrypted client notes.** The private "client" field is AES-GCM encrypted in the browser with a key derived from the recovery phrase. The server stores only `enc1:…` ciphertext.
 - **Payment links** (`/l/<id>`): reusable links with a fixed price or a payer-chosen amount (optional min/max and suggested amounts), plus up to 8 custom form fields (text, email, phone, long text, dropdown). Each payer's checkout becomes its own invoice on a fresh shielded address. Answers are sealed in the payer's browser to the creator's X25519 key (derived from the recovery phrase; `box1:` = ephemeral ECDH + HKDF-SHA256 + AES-GCM), so the server only stores ciphertext. Links can be paused.
 - Live dashboard: shielded ZEC received, outstanding, 30-day chart, payment attempts per invoice.

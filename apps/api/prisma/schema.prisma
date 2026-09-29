@@ -90,13 +90,11 @@ model Invoice {
   creator           Creator       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   title             String
   description       String?
-  /// Private note for the creator. Never shown on the payment page. (Legacy: new invoices use billTo.)
+  /// Private note for the creator. Never shown on the payment page. (Legacy: new invoices use clientName/clientEmail.)
   clientLabel       String?
-  /// Client name/email, AES-GCM encrypted in the creator's browser with a per-invoice share key ("sk1:…").
-  /// The key travels only in the payment link's #fragment, so payers can read it and the server can't.
-  billTo            String?
-  /// The same share key, sealed with the creator's notes key ("enc1:…") so their dashboard can rebuild the link.
-  billToKey         String?
+  /// Optional "billed to" details, shown on the payment page.
+  clientName        String?
+  clientEmail       String?
   editedAt          DateTime?
   lineItems         Json
   currency          Currency

@@ -74,8 +74,8 @@ export async function createInvoice(
     title: string;
     description?: string | null;
     clientLabel?: string | null;
-    billTo?: string | null;
-    billToKey?: string | null;
+    clientName?: string | null;
+    clientEmail?: string | null;
     lineItems: LineItem[];
     currency: "USD" | "ZEC";
     amount: string;
@@ -99,8 +99,8 @@ export async function createInvoice(
         title: data.title,
         description: data.description || null,
         clientLabel: data.clientLabel || null,
-        billTo: data.billTo || null,
-        billToKey: data.billToKey || null,
+        clientName: data.clientName || null,
+        clientEmail: data.clientEmail || null,
         lineItems: data.lineItems as Prisma.InputJsonValue,
         currency: data.currency,
         amount: data.amount,
@@ -135,8 +135,8 @@ export async function toInvoiceDTO(invoice: InvoiceWithRelations): Promise<Invoi
     title: invoice.title,
     description: invoice.description,
     clientLabel: invoice.clientLabel,
-    billTo: invoice.billTo,
-    billToKey: invoice.billToKey,
+    clientName: invoice.clientName,
+    clientEmail: invoice.clientEmail,
     editedAt: invoice.editedAt?.toISOString() ?? null,
     currency: invoice.currency,
     amount: invoice.amount.toString(),
@@ -181,7 +181,8 @@ export async function toPublicInvoiceDTO(
     number: invoice.number,
     title: invoice.title,
     description: invoice.description,
-    billTo: invoice.billTo,
+    clientName: invoice.clientName,
+    clientEmail: invoice.clientEmail,
     currency: invoice.currency,
     amount: invoice.amount.toString(),
     lineItems: invoice.lineItems as LineItem[],

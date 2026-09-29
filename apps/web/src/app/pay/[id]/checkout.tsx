@@ -1,6 +1,6 @@
 "use client";
 
-import { ZEC_ASSET_ID, type BillTo, type PublicInvoiceDTO, type QuotePreviewDTO, type SwapDTO, type TokenDTO } from "@petrapay/shared";
+import { ZEC_ASSET_ID, type PublicInvoiceDTO, type QuotePreviewDTO, type SwapDTO, type TokenDTO } from "@petrapay/shared";
 import { XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ChooseStep } from "@/components/app/checkout/choose-step";
@@ -12,7 +12,6 @@ import { TokenSelector } from "@/components/app/token-selector";
 import { Loader } from "@/components/motion/loader";
 import { useTokens } from "@/hooks/use-tokens";
 import { api } from "@/lib/api";
-import { keyFromLocation, openBillTo } from "@/lib/share-key";
 import { DepositStep } from "./deposit-step";
 import { InvoicePanel } from "./invoice-panel";
 import { PaidState } from "./paid-state";
@@ -29,7 +28,6 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
   const [token, setToken] = useState<TokenDTO | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [swap, setSwap] = useState<SwapDTO | null>(null);
-  const [billTo, setBillTo] = useState<BillTo | null>(null);
   // True until we've checked for a payment this browser already started.
   const [resuming, setResuming] = useState(initial.status !== "PAID" && initial.status !== "CANCELLED");
 
@@ -48,19 +46,6 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
       : Promise.resolve();
     lookup.catch(() => undefined).finally(() => setResuming(false));
   }, [initial.id]);
-
-  // Client details are sealed with a key that only travels in the link's #fragment.
-  useEffect(() => {
-    const key = keyFromLocation();
-    if (!key || !invoice.billTo) return;
-    let alive = true;
-    openBillTo(key, invoice.billTo).then((details) => {
-      if (alive) setBillTo(details);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [invoice.billTo]);
 
   const reset = useCallback(() => {
     setSwap(null);
@@ -92,7 +77,7 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
 
   return (
     <CheckoutFrame
-      panel={<InvoicePanel invoice={invoice} billTo={billTo} />}
+      panel={<InvoicePanel invoice={invoice} />}
       stage={stage}
       overlay={
         <TokenSelector

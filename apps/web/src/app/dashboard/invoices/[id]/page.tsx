@@ -7,7 +7,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/app/copy-button";
 import { editBlocker } from "@/components/app/invoice-form";
-import { formatDate, formatInvoiceAmount } from "@/components/app/invoice-row";
+import { formatDate, formatInvoiceAmount, payUrl } from "@/components/app/invoice-row";
 import { ResponsesList } from "@/components/app/links/responses";
 import { QrCode } from "@/components/app/qr";
 import { InvoicePill, Panel, SwapPill } from "@/components/app/dash/ui";
@@ -15,7 +15,6 @@ import { useToast } from "@/components/app/toaster";
 import { TokenIcon } from "@/components/app/token-icon";
 import { Loader } from "@/components/motion/loader";
 import { useApi } from "@/hooks/use-api";
-import { useInvoiceShare } from "@/hooks/use-invoice-share";
 import { NoteText } from "@/hooks/use-note";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -36,7 +35,6 @@ export default function InvoiceDetailPage() {
   });
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState<"cancel" | "paid" | null>(null);
-  const share = useInvoiceShare(invoice ?? { id, billTo: null, billToKey: null, clientLabel: null });
 
   useEffect(() => {
     const created = params.get("created");
@@ -56,14 +54,13 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  // Includes the #fragment key once decrypted, so the client can see who the invoice is for.
-  const link = share.url;
+  const link = payUrl(invoice.id);
   const editable = !editBlocker(invoice);
   const number = String(invoice.number).padStart(3, "0");
-  const mailto = share.client.email
-    ? `mailto:${encodeURIComponent(share.client.email)}?${new URLSearchParams({
+  const mailto = invoice.clientEmail
+    ? `mailto:${encodeURIComponent(invoice.clientEmail)}?${new URLSearchParams({
         subject: `Invoice #${number}: ${invoice.title}`,
-        body: `Hi${share.client.name ? ` ${share.client.name}` : ""},\n\nHere's your invoice for ${invoice.title} (${formatInvoiceAmount(invoice)}). You can pay with any token:\n\n${link}\n\nThank you!`,
+        body: `Hi${invoice.clientName ? ` ${invoice.clientName}` : ""},\n\nHere's your invoice for ${invoice.title} (${formatInvoiceAmount(invoice)}). You can pay with any token:\n\n${link}\n\nThank you!`,
       })
         .toString()
         .replace(/\+/g, "%20")}`
@@ -150,9 +147,9 @@ export default function InvoiceDetailPage() {
               <Mail className="size-3.5" /> Email invoice
             </a>
           ) : null}
-          <a href={link} target="_blank" rel="noreferrer" className="btn-soft h-9 rounded-xl px-3 text-sm font-medium">
+          <Link href={`/pay/${invoice.id}`} target="_blank" className="btn-soft h-9 rounded-xl px-3 text-sm font-medium">
             Open checkout <ExternalLink className="size-3.5" />
-          </a>
+          </Link>
           {editable ? (
             <Link href={`/dashboard/invoices/${invoice.id}/edit`} className="btn-soft h-9 rounded-xl px-3 text-sm font-medium">
               <Pencil className="size-3.5" /> Edit
@@ -336,23 +333,15 @@ export default function InvoiceDetailPage() {
           <Panel title="Details">
             <dl className="space-y-3.5 px-5 py-4 text-sm">
               <Detail label="Billed to">
-                {invoice.billToKey ? (
-                  share.status === "opening" ? (
-                    "…"
-                  ) : share.status === "locked" ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <Lock className="size-3.5" /> Encrypted
-                    </span>
-                  ) : (
-                    <span className="block min-w-0">
-                      {share.client.name ? <span className="block">{share.client.name}</span> : null}
-                      {share.client.email ? (
-                        <a href={`mailto:${share.client.email}`} className="block truncate text-xs text-primary hover:underline">
-                          {share.client.email}
-                        </a>
-                      ) : null}
-                    </span>
-                  )
+                {invoice.clientName || invoice.clientEmail ? (
+                  <span className="block min-w-0">
+                    {invoice.clientName ? <span className="block">{invoice.clientName}</span> : null}
+                    {invoice.clientEmail ? (
+                      <a href={`mailto:${invoice.clientEmail}`} className="block truncate text-xs text-primary hover:underline">
+                        {invoice.clientEmail}
+                      </a>
+                    ) : null}
+                  </span>
                 ) : invoice.clientLabel ? (
                   <NoteText value={invoice.clientLabel} fallback="—" />
                 ) : (

@@ -331,13 +331,12 @@ describe("payment links", () => {
 });
 
 describe("editing invoices and client details", () => {
-  const billTo = "sk1:ciphertext";
-  const billToKey = "enc1:wrapped-key";
+  const client = { clientName: "Acme Studio", clientEmail: "billing@acme.test" };
 
   async function openInvoice(extra: Record<string, unknown> = {}) {
     const creator = await signIn();
     await creator.call("POST", "/addresses", { address: ORCHARD[0] });
-    const inv = (await creator.call("POST", "/invoices", { ...invoiceBody, billTo, billToKey, ...extra })).json();
+    const inv = (await creator.call("POST", "/invoices", { ...invoiceBody, ...client, ...extra })).json();
     return { ...creator, inv };
   }
 
@@ -365,21 +364,19 @@ describe("editing invoices and client details", () => {
       },
     });
 
-  test("client details are stored sealed and reach the payer only as ciphertext", async () => {
-    const { inv } = await openInvoice();
-    assert.equal(inv.billTo, billTo);
-    assert.equal(inv.billToKey, billToKey);
+  test("client details are optional and shown to the payer", async () => {
+    const { inv, call } = await openInvoice();
+    assert.equal(inv.clientName, "Acme Studio");
+    assert.equal(inv.clientEmail, "billing@acme.test");
     const pub = (await app.inject({ method: "GET", url: `/public/invoices/${inv.id}` })).json();
-    assert.equal(pub.billTo, billTo);
-    assert.ok(!JSON.stringify(pub).includes("wrapped-key"), "the wrapped key stays with the creator");
-  });
+    assert.equal(pub.clientName, "Acme Studio");
+    assert.equal(pub.clientEmail, "billing@acme.test");
 
-  test("plaintext client details are rejected", async () => {
-    const { call } = await signIn();
-    await call("POST", "/addresses", { address: ORCHARD[0] });
-    const res = await call("POST", "/invoices", { ...invoiceBody, billTo: '{"name":"Acme"}', billToKey });
-    assert.equal(res.statusCode, 400);
-    assert.equal((await call("POST", "/invoices", { ...invoiceBody, billTo })).statusCode, 400, "details without their key");
+    // Blank fields from the form mean "not set".
+    const bare = (await call("POST", "/invoices", { ...invoiceBody, clientName: "  ", clientEmail: "" })).json();
+    assert.equal(bare.clientName, null);
+    assert.equal(bare.clientEmail, null);
+    assert.equal((await call("POST", "/invoices", { ...invoiceBody, clientEmail: "not-an-email" })).statusCode, 400);
   });
 
   test("an open invoice can be edited, and totals are recomputed", async () => {
@@ -398,11 +395,11 @@ describe("editing invoices and client details", () => {
     assert.equal(edited.title, "Logo + icons");
     assert.equal(edited.amount, "230");
     assert.ok(edited.editedAt);
-    // Leaving the client fields out keeps them; null clears them.
-    assert.equal(edited.billTo, billTo);
-    const cleared = (await call("PUT", `/invoices/${inv.id}`, { ...invoiceBody, billTo: null, billToKey: null })).json();
-    assert.equal(cleared.billTo, null);
-    assert.equal(cleared.billToKey, null);
+    // Edits replace the editable fields, so leaving the client out clears it.
+    assert.equal(edited.clientName, null);
+    const renamed = (await call("PUT", `/invoices/${inv.id}`, { ...invoiceBody, clientName: "Acme Ltd" })).json();
+    assert.equal(renamed.clientName, "Acme Ltd");
+    assert.equal(renamed.clientEmail, null);
   });
 
   test("the total is frozen while a client holds a live quote", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatAmount, formatUsd, type BillTo, type PublicInvoiceDTO } from "@petrapay/shared";
+import { formatAmount, formatUsd, type PublicInvoiceDTO } from "@petrapay/shared";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { CheckoutPanel } from "@/components/app/checkout/panel";
@@ -10,7 +10,7 @@ import { InvoiceStatusBadge, isOverdue } from "@/components/app/status-badge";
 import { cn } from "@/lib/utils";
 
 /** Who is asking, for what, and how much. Details fold away on small screens to keep the form in view. */
-export function InvoicePanel({ invoice, billTo = null }: { invoice: PublicInvoiceDTO; billTo?: BillTo | null }) {
+export function InvoicePanel({ invoice }: { invoice: PublicInvoiceDTO }) {
   const [open, setOpen] = useState(false);
   // A link payment is a single line named after the link, so the breakdown would only repeat the title.
   const showItems = !(invoice.lineItems.length === 1 && invoice.lineItems[0]!.description === invoice.title);
@@ -26,10 +26,10 @@ export function InvoicePanel({ invoice, billTo = null }: { invoice: PublicInvoic
       </p>
       <AmountHeading currency={invoice.currency} amount={invoice.amount} className="mt-3 sm:mt-4" />
       <p className="mt-2 text-base leading-snug text-pretty text-foreground/80 sm:mt-3 sm:text-lg">{invoice.title}</p>
-      {billTo && (billTo.name || billTo.email) ? (
+      {invoice.clientName || invoice.clientEmail ? (
         <p className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm text-muted-foreground">
-          Billed to <span className="font-medium text-foreground/80">{billTo.name ?? billTo.email}</span>
-          {billTo.name && billTo.email ? <span className="hidden truncate lg:inline">· {billTo.email}</span> : null}
+          Billed to <span className="font-medium text-foreground/80">{invoice.clientName ?? invoice.clientEmail}</span>
+          {invoice.clientName && invoice.clientEmail ? <span className="hidden truncate lg:inline">· {invoice.clientEmail}</span> : null}
         </p>
       ) : null}
 

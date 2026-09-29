@@ -14,35 +14,26 @@ export const lineItemSchema = z.object({
   unitAmount: decimalString,
 });
 
-/** Client details sealed with the invoice's share key ("sk1:…"). Null clears them. */
-const sealedBillTo = z.string().startsWith("sk1:", "Client details must be encrypted in the browser").max(4000);
-/** The share key sealed with the creator's notes key ("enc1:…"). */
-const sealedShareKey = z.string().startsWith("enc1:", "The share key must be encrypted in the browser").max(512);
+/** Trims optional form fields; an empty one counts as "not set". */
+const blankToNull = (v: unknown) => (typeof v === "string" ? v.trim() || null : v);
 
-export const createInvoiceSchema = z
-  .object({
-    title: z.string().trim().min(1, "Give the invoice a title").max(120),
-    description: z.string().trim().max(2000).optional(),
-    /** Encrypted in the creator's browser before upload ("enc1:…"), so the server never sees it. */
-    clientLabel: z.string().trim().max(512).optional(),
-    billTo: sealedBillTo.nullable().optional(),
-    billToKey: sealedShareKey.nullable().optional(),
-    currency: z.enum(["USD", "ZEC"]),
-    lineItems: z.array(lineItemSchema).min(1).max(50),
-    dueDate: z.iso.datetime().nullable().optional(),
-  })
-  .refine((v) => !v.billTo === !v.billToKey, { message: "Client details and their key go together", path: ["billToKey"] });
+export const createInvoiceSchema = z.object({
+  title: z.string().trim().min(1, "Give the invoice a title").max(120),
+  description: z.string().trim().max(2000).optional(),
+  /** Encrypted in the creator's browser before upload ("enc1:…"), so the server never sees it. (Legacy.) */
+  clientLabel: z.string().trim().max(512).optional(),
+  /** Optional "billed to" details, shown on the payment page. */
+  clientName: z.preprocess(blankToNull, z.string().max(120).nullable().optional()),
+  clientEmail: z.preprocess(blankToNull, z.email("Enter a valid email address").max(200).nullable().optional()),
+  currency: z.enum(["USD", "ZEC"]),
+  lineItems: z.array(lineItemSchema).min(1).max(50),
+  dueDate: z.iso.datetime().nullable().optional(),
+});
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 
-/**
- * Full replacement of an invoice's editable fields. `billTo`/`billToKey` left out keep their current
- * values (e.g. when this device can't decrypt them); null clears them. The legacy client note is untouched.
- */
+/** Full replacement of an invoice's editable fields; anything optional left out is cleared. The legacy client note is untouched. */
 export const updateInvoiceSchema = createInvoiceSchema;
 export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
-
-/** What's inside `billTo` once decrypted. */
-export type BillTo = { v: 1; name?: string; email?: string };
 
 export const addAddressSchema = z.object({
   address: z.string().trim().min(10).max(1000),
@@ -226,8 +217,8 @@ export type InvoiceDTO = {
   title: string;
   description: string | null;
   clientLabel: string | null;
-  billTo: string | null;
-  billToKey: string | null;
+  clientName: string | null;
+  clientEmail: string | null;
   editedAt: string | null;
   currency: "USD" | "ZEC";
   amount: string;
@@ -248,8 +239,8 @@ export type PublicInvoiceDTO = {
   number: number;
   title: string;
   description: string | null;
-  /** Encrypted client details; readable only with the key in the payment link's #fragment. */
-  billTo: string | null;
+  clientName: string | null;
+  clientEmail: string | null;
   currency: "USD" | "ZEC";
   amount: string;
   lineItems: LineItem[];

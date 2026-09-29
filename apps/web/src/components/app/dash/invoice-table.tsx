@@ -5,7 +5,9 @@ import { FileText, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { ClientName, ShareCopyButton } from "../invoice-share";
+import { CopyButton } from "../copy-button";
+import { ClientName } from "../invoice-share";
+import { payUrl } from "../invoice-row";
 import { InvoicePill } from "./ui";
 
 const date = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -101,7 +103,7 @@ export function InvoiceTable({ invoices, compact = false }: { invoices: InvoiceD
               <td className="px-3 py-3.5 whitespace-nowrap text-muted-foreground">{compact ? date(inv.createdAt) : inv.dueDate ? date(inv.dueDate) : "—"}</td>
               {!compact ? <td className="px-3 py-3.5 whitespace-nowrap text-muted-foreground">{date(inv.createdAt)}</td> : null}
               <td className="py-3.5 pr-5 pl-3" onClick={(e) => e.stopPropagation()}>
-                <ShareCopyButton invoice={inv} className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100" />
+                <CopyButton value={payUrl(inv.id)} label="Copy payment link" className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100" />
               </td>
             </tr>
           ))}
