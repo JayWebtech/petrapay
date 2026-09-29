@@ -188,6 +188,8 @@ export type SwapDTO = {
   destinationTxs: TxLink[];
   refundedAmountFormatted: string | null;
   createdAt: string;
+  /** When the deposit was first seen on-chain. */
+  detectedAt: string | null;
   settledAt: string | null;
 };
 

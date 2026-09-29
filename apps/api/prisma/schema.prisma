@@ -207,6 +207,8 @@ model Swap {
   depositTxHash      String?
   swapDetails        Json?
   lastCheckedAt      DateTime?
+  /// When the deposit was first seen; the payer's "usually done in 15 minutes" timer starts here.
+  detectedAt         DateTime?
   settledAt          DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt

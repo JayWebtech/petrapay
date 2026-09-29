@@ -72,6 +72,7 @@ export async function toSwapDTO(swap: Swap): Promise<SwapDTO> {
     destinationTxs: txs(details?.destinationChainTxHashes),
     refundedAmountFormatted: details?.refundedAmountFormatted ?? null,
     createdAt: swap.createdAt.toISOString(),
+    detectedAt: swap.detectedAt?.toISOString() ?? null,
     settledAt: swap.settledAt?.toISOString() ?? null,
   };
 }
@@ -79,6 +80,9 @@ export async function toSwapDTO(swap: Swap): Promise<SwapDTO> {
 export function isTerminal(status: string): boolean {
   return TERMINAL_SWAP_STATUSES.includes(status as SwapStatus);
 }
+
+/** Statuses that mean the deposit has arrived. */
+const DETECTED: SwapStatus[] = ["KNOWN_DEPOSIT_TX", "PROCESSING", "SUCCESS", "REFUNDED", "FAILED"];
 
 /** Pulls the latest status from 1Click and applies any transition. Returns the updated swap. */
 export async function refreshSwap(swap: Swap): Promise<Swap> {
@@ -103,6 +107,7 @@ export async function refreshSwap(swap: Swap): Promise<Swap> {
       status,
       lastCheckedAt: new Date(),
       ...(remote ? { swapDetails: remote.swapDetails as unknown as Prisma.InputJsonValue } : {}),
+      ...(DETECTED.includes(status) && !swap.detectedAt ? { detectedAt: new Date() } : {}),
       ...(status === "SUCCESS" && !swap.settledAt ? { settledAt: new Date() } : {}),
     },
   });

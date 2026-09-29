@@ -1,10 +1,10 @@
 "use client";
 
 import { chainMeta, formatAmount, formatUsd, type InvoiceStatus, type PublicInvoiceDTO, type SwapDTO } from "@petrapay/shared";
-import { AlertTriangle, ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock, ExternalLink, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock, DoorOpen, ExternalLink, Wallet } from "lucide-react";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { CopyButton, CopyField } from "@/components/app/copy-button";
-import { Countdown, useNow } from "@/components/app/countdown";
+import { Countdown, formatDuration, useNow } from "@/components/app/countdown";
 import { QrCode } from "@/components/app/qr";
 import { SwapTracker } from "@/components/app/swap-tracker";
 import { useToast } from "@/components/app/toaster";
@@ -21,6 +21,8 @@ import { payWithSolana } from "@/lib/wallets/solana";
 import { OrDivider, StepHeader } from "@/components/app/checkout/utils";
 
 const POLL_MS = 4000;
+/** How long we tell payers a swap usually takes, from deposit to delivery. */
+const TYPICAL_MS = 15 * 60_000;
 
 export function DepositStep({
   invoice,
@@ -91,6 +93,7 @@ export function DepositStep({
 
   const pending = swap.status === "PENDING_DEPOSIT" && !expired;
   const awaitingFunds = swap.status === "PENDING_DEPOSIT" || swap.status === "INCOMPLETE_DEPOSIT";
+  const swapping = swap.status === "KNOWN_DEPOSIT_TX" || swap.status === "PROCESSING";
 
   return (
     <div>
@@ -118,6 +121,8 @@ export function DepositStep({
             : `We've got your ${swap.originSymbol}. It's being swapped and delivered privately to ${invoice.creatorName}.`
         }
       />
+
+      {swapping ? <SwappingNotice swap={swap} now={now} creatorName={invoice.creatorName} chainName={meta.name} /> : null}
 
       {awaitingFunds ? (
         <>
@@ -249,5 +254,56 @@ export function DepositStep({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** While the swap runs: a countdown against the usual 15 minutes, and reassurance that the payer can leave. */
+function SwappingNotice({ swap, now, creatorName, chainName }: { swap: SwapDTO; now: number; creatorName: string; chainName: string }) {
+  // Starts when the deposit was detected; payments from before that was recorded start when this page saw them.
+  const [seenAt] = useState(() => Date.now());
+  const start = swap.detectedAt ? new Date(swap.detectedAt).getTime() : seenAt;
+  const elapsed = Math.max(0, now - start);
+  const left = TYPICAL_MS - elapsed;
+  const late = left <= 0;
+  const pct = Math.min(100, (elapsed / TYPICAL_MS) * 100);
+
+  return (
+    <>
+      <div className="mt-8 rounded-3xl border border-border bg-white p-5 shadow-[0_3px_0_0_#eeedf5]">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground">{late ? "Taking a little longer than usual" : "Estimated time left"}</p>
+            <p className="mt-1 text-3xl font-semibold tracking-tight tabular">{formatDuration(late ? elapsed : left)}</p>
+          </div>
+          <span className="pb-1 text-xs text-muted-foreground">{late ? "elapsed" : "of 15:00"}</span>
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Estimated swap progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+          className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted"
+        >
+          <div className={late ? "h-full rounded-full bg-amber-400" : "h-full rounded-full bg-primary transition-[width] duration-1000 ease-linear"} style={{ width: `${pct}%` }} />
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          {late
+            ? `Nothing to do on your side. It will complete, or be refunded to your ${chainName} address automatically.`
+            : "Most payments finish in a few minutes. We allow up to 15."}
+        </p>
+      </div>
+
+      <div className="mt-4 flex gap-3 rounded-2xl border border-primary/15 bg-[#f6f5fe] p-4 text-sm">
+        <DoorOpen className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div>
+          <p className="font-semibold">You can close this tab</p>
+          <p className="mt-1 leading-relaxed text-muted-foreground">
+            Your payment is on its way and {creatorName} receives it even if you leave. If anything goes wrong, it&apos;s refunded to your {chainName} address
+            automatically. Open this link again anytime to check.
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
