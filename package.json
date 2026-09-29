@@ -13,6 +13,7 @@
     "dev:web": "pnpm --filter @petrapay/web dev",
     "build:api": "pnpm --filter @petrapay/api build",
     "start:api": "pnpm --filter @petrapay/api start:prod",
+    "start": "pnpm --filter @petrapay/api start:prod",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",

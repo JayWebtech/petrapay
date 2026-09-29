@@ -103,7 +103,7 @@ Anyone can run their own instance; creators' funds never touch the operator. No 
 
 **Web (Vercel).** Set the project's root directory to `apps/web`; `apps/web/vercel.json` installs only the web app and the shared package. Set `API_URL` to the API's URL (it's baked in at build time, so redeploy after changing it) and `NEXT_PUBLIC_SOLANA_RPC_URL`.
 
-**API (any Node host: Railway, Render, Fly, a VPS).** From the repo root:
+**API (any Node host: Railway, Render, Fly, a VPS).** On Railway, `railway.json` at the repo root sets these commands for you. Elsewhere, from the repo root:
 
 ```bash
 # Build
