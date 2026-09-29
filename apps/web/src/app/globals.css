@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+/*
+ * PetraPay theme: a single light theme. Tokens follow the shadcn-style names beUI components
+ * expect (background, foreground, muted, card, primary, border, ring, destructive…).
+ * Primary is PetraPay indigo; neutrals carry a faint indigo tint so the palette reads as one.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #110f24;
+  --card: #ffffff;
+  --card-foreground: #110f24;
+  --popover: #ffffff;
+  --popover-foreground: #110f24;
+  --muted: #f5f4fa;
+  --muted-foreground: #66647a;
+  --border: #e6e4f0;
+  --input: #e6e4f0;
+  --ring: #072ac8;
+  --primary: #072ac8;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f4fa;
+  --secondary-foreground: #110f24;
+  --accent: #efecfd;
+  --accent-foreground: #2c1ea3;
+  --destructive: #d92d20;
+  --success: #067647;
+  --shield: #072ac8;
+  --radius: 14px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-shield: var(--shield);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
+  }
+}
+
+@utility press {
+  transition: transform 160ms var(--ease-out);
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility card {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: 0 1px 2px rgb(17 15 36 / 0.04), 0 1px 1px rgb(17 15 36 / 0.02);
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ── Marquee animations ───────────────────────────────────────────────────── */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(calc(-100% - var(--gap, 1rem)));
+  }
+}
+
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(calc(-100% - var(--gap, 1rem)));
+  }
+}
+
+@theme inline {
+  --animate-marquee: marquee linear infinite;
+  --animate-marquee-vertical: marquee-vertical linear infinite;
+}
+
+/* Tactile buttons: a solid bottom edge that compresses on press. */
+@utility btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--foreground);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 0 #e3e1ee;
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), border-color 150ms;
+
+  &:hover {
+    border-color: #d6d3e6;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 0 #e3e1ee;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+@utility btn-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: 16px;
+  box-shadow: 0 4px 0 0 #271a95, 0 10px 24px -12px rgb(59 40 204 / 0.6);
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), background-color 150ms;
+
+  &:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 0 #271a95, 0 4px 12px -8px rgb(59 40 204 / 0.6);
+  }
+
+  &:disabled {
+    background: #b9b1ee;
+    box-shadow: 0 4px 0 0 #a39ae3;
+    cursor: not-allowed;
+  }
+
+  /* Busy (e.g. "Creating…") is disabled too, but should keep its colour rather than look unavailable. */
+  &:disabled[aria-busy="true"] {
+    background: var(--primary);
+    box-shadow: 0 4px 0 0 #271a95, 0 10px 24px -12px rgb(59 40 204 / 0.6);
+    cursor: progress;
+  }
+}
+
+@utility icon-tile {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 3px 0 0 #e9e7f2;
+}

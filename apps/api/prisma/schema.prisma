@@ -1,0 +1,220 @@
+// PetraPay data model.
+//
+// The platform is non-custodial: it never holds keys or funds. It stores invoice metadata,
+// the creator's pool of shielded receiving addresses, and a mirror of each 1Click swap's status.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// A creator is identified only by an ed25519 public key generated in their browser.
+/// No email, password, or wallet address is collected.
+model Creator {
+  id          String   @id @default(cuid())
+  publicKey   String   @unique
+  displayName String?
+  /// X25519 public key payers encrypt form responses to. The private half never leaves the creator's browser.
+  boxPublicKey String?
+  invoiceSeq  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions  Session[]
+  addresses ShieldedAddress[]
+  invoices  Invoice[]
+  swaps     Swap[]
+  links     PaymentLink[]
+}
+
+model AuthChallenge {
+  nonce     String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  creatorId String
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([creatorId])
+}
+
+/// Unified addresses (with an Orchard receiver) that invoices settle to.
+/// Each new invoice takes an unused address so invoices can't be linked to each other
+/// through the recipient field that NEAR Intents' public explorer displays.
+model ShieldedAddress {
+  id             String    @id @default(cuid())
+  creatorId      String
+  creator        Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  address        String
+  label          String?
+  hasOrchard     Boolean
+  hasSapling     Boolean
+  hasTransparent Boolean
+  isDefault      Boolean   @default(false)
+  assignedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  invoices Invoice[]
+
+  @@unique([creatorId, address])
+  @@index([creatorId, assignedAt])
+}
+
+enum InvoiceStatus {
+  OPEN
+  PROCESSING
+  PAID
+  CANCELLED
+}
+
+enum Currency {
+  USD
+  ZEC
+}
+
+model Invoice {
+  /// Public, unguessable id used in the payment link.
+  id                String        @id
+  number            Int
+  creatorId         String
+  creator           Creator       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  /// Private note for the creator. Never shown on the payment page. (Legacy: new invoices use billTo.)
+  clientLabel       String?
+  /// Client name/email, AES-GCM encrypted in the creator's browser with a per-invoice share key ("sk1:…").
+  /// The key travels only in the payment link's #fragment, so payers can read it and the server can't.
+  billTo            String?
+  /// The same share key, sealed with the creator's notes key ("enc1:…") so their dashboard can rebuild the link.
+  billToKey         String?
+  editedAt          DateTime?
+  lineItems         Json
+  currency          Currency
+  amount            Decimal       @db.Decimal(30, 8)
+  status            InvoiceStatus @default(OPEN)
+  addressId         String
+  address           ShieldedAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  addressReused     Boolean       @default(false)
+  dueDate           DateTime?
+  paidAt            DateTime?
+  receivedZats      BigInt?
+  receivedUsd       Decimal?      @db.Decimal(20, 2)
+  payerMarkedPaidAt DateTime?
+  cancelledAt       DateTime?
+  /// Set when this invoice was created by a payer through a payment link.
+  linkId            String?
+  link              PaymentLink?  @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  /// Form responses sealed to the creator's box key in the payer's browser ("box1:…").
+  responses         String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  swaps Swap[]
+
+  @@unique([creatorId, number])
+  @@index([creatorId, status])
+  @@index([linkId])
+}
+
+enum LinkAmountType {
+  FIXED
+  CUSTOM
+}
+
+/// A reusable checkout: fixed or payer-chosen amount, plus fields to collect.
+/// Each payment through it becomes its own invoice with a fresh shielded address.
+model PaymentLink {
+  /// Public, unguessable id used in /l/:id.
+  id          String         @id
+  creatorId   String
+  creator     Creator        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  currency    Currency
+  amountType  LinkAmountType
+  amount      Decimal?       @db.Decimal(30, 8)
+  minAmount   Decimal?       @db.Decimal(30, 8)
+  maxAmount   Decimal?       @db.Decimal(30, 8)
+  /// Suggested amounts shown to the payer for CUSTOM links.
+  presets     Json
+  /// Fields to collect: [{ id, label, type, required, options? }]
+  fields      Json
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  invoices Invoice[]
+
+  @@index([creatorId])
+}
+
+enum SwapKind {
+  INVOICE_PAYMENT
+  WITHDRAWAL
+}
+
+enum SwapStatus {
+  PENDING_DEPOSIT
+  KNOWN_DEPOSIT_TX
+  PROCESSING
+  SUCCESS
+  INCOMPLETE_DEPOSIT
+  REFUNDED
+  FAILED
+  EXPIRED
+}
+
+/// A 1Click quote with a live deposit address: either a client paying an invoice
+/// (any token -> shielded ZEC) or a creator withdrawing (ZEC -> any token).
+model Swap {
+  id                 String     @id @default(cuid())
+  kind               SwapKind
+  creatorId          String
+  creator            Creator    @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  invoiceId          String?
+  invoice            Invoice?   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  swapType           String
+  originAsset        String
+  destinationAsset   String
+  amountIn           String
+  amountInFormatted  String
+  amountInUsd        String?
+  amountOut          String
+  amountOutFormatted String
+  amountOutUsd       String?
+  recipient          String
+  refundTo           String
+  depositAddress     String
+  depositMemo        String?
+  /// Pay-by time we requested. After it, 1Click refunds instead of swapping.
+  deadline           DateTime
+  /// When 1Click stops watching the deposit address.
+  inactiveAt         DateTime
+  timeEstimate       Int?
+  confidentiality    String
+  correlationId      String
+  /// Full signed quote response, kept to resolve disputes with 1Click.
+  quoteResponse      Json
+  status             SwapStatus @default(PENDING_DEPOSIT)
+  depositTxHash      String?
+  swapDetails        Json?
+  lastCheckedAt      DateTime?
+  settledAt          DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@unique([depositAddress, depositMemo])
+  @@index([status, lastCheckedAt])
+  @@index([invoiceId])
+  @@index([creatorId, kind])
+}

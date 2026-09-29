@@ -1,0 +1,15 @@
+node_modules
+.pnpm-store
+dist
+.next
+out
+coverage
+*.log
+.env
+.env.local
+.env.*.local
+!.env.example
+.DS_Store
+apps/api/src/generated
+*.tsbuildinfo
+next-env.d.ts

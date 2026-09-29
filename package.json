@@ -1,0 +1,21 @@
+{
+  "name": "petrapay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Privacy-first cross-chain invoicing for creators. Get paid in any token, settle to shielded ZEC.",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @petrapay/api --filter @petrapay/web dev",
+    "dev:api": "pnpm --filter @petrapay/api dev",
+    "dev:web": "pnpm --filter @petrapay/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d postgres",
+    "db:migrate": "pnpm --filter @petrapay/api db:migrate",
+    "db:studio": "pnpm --filter @petrapay/api db:studio"
+  }
+}
