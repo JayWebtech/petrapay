@@ -59,13 +59,13 @@ apps/web          Next.js 16 (App Router) + Tailwind v4 + beUI components. Landi
 
 ## Getting started
 
-Requirements: Node ≥ 20.19, pnpm 9, Docker (for Postgres).
+Requirements: Node ≥ 20.19, pnpm 9, and Postgres 15+. `pnpm db:up` starts a local Postgres in Docker for development; any other Postgres works too (point `DATABASE_URL` at it).
 
 ```bash
 pnpm install
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
-docker compose up -d postgres
+pnpm db:up          # or use your own Postgres
 pnpm db:migrate
 pnpm dev            # API on :4000, web on :3000
 ```
@@ -97,16 +97,22 @@ pnpm typecheck
 
 API tests run against a separate `petrapay_test` database, created and migrated automatically.
 
-### Self-hosting
+### Deploying
 
-Anyone can run their own instance; creators' funds never touch the operator.
+Anyone can run their own instance; creators' funds never touch the operator. No Docker needed.
+
+**Web (Vercel).** Set the project's root directory to `apps/web`; `apps/web/vercel.json` installs only the web app and the shared package. Set `API_URL` to the API's URL (it's baked in at build time, so redeploy after changing it) and `NEXT_PUBLIC_SOLANA_RPC_URL`.
+
+**API (any Node host: Railway, Render, Fly, a VPS).** From the repo root:
 
 ```bash
-cp apps/api/.env.example apps/api/.env   # set ONECLICK_JWT etc.
-docker compose --profile app up -d --build
+# Build
+pnpm install --frozen-lockfile --filter @petrapay/api... && pnpm build:api
+# Start: applies pending migrations, then runs the API and the status worker
+pnpm start:api
 ```
 
-This starts Postgres, the API (running migrations on boot) and the web app on port 3000. Put it behind an HTTPS reverse proxy (Caddy, nginx, a load balancer) and set `COOKIE_SECURE=true` and `APP_ORIGIN`. The proxy must set `X-Forwarded-For`: the Next.js `/api` rewrite passes it through but doesn't add it, and the API's per-IP rate limits depend on it. Keep the API itself off the public internet, as the compose file does.
+Set the API's environment on the host (not in a committed file): `DATABASE_URL`, `APP_ORIGIN` (the web URL), `COOKIE_SECURE=true`, `ONECLICK_JWT` and the rest of the table above. It listens on `PORT`. The host or proxy in front of the API must set `X-Forwarded-For`: the Next.js `/api` rewrite passes it through but doesn't add it, and the API's per-IP rate limits depend on it. Only the web app needs to reach the API.
 
 ## Known limitations and next steps
 
