@@ -4,8 +4,6 @@ import type { NextConfig } from "next";
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
 
 const nextConfig: NextConfig = {
-  // Docker builds use the minimal standalone server.
-  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   outputFileTracingRoot: path.join(__dirname, "../.."),
   // The shared workspace package ships TypeScript source.
   transpilePackages: ["@petrapay/shared"],

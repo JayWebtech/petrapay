@@ -1,5 +1,4 @@
-# Local development:   docker compose up -d postgres
-# Full self-hosted:    docker compose --profile app up -d --build
+# Local development database only: `pnpm db:up`. Any Postgres 15+ works; production doesn't use Docker.
 services:
   postgres:
     image: postgres:17-alpine
@@ -17,38 +16,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
-  api:
-    profiles: ["app"]
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - path: apps/api/.env
-        required: false
-    environment:
-      DATABASE_URL: postgresql://petrapay:petrapay@postgres:5432/petrapay
-      PORT: 4000
-      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
-
-  web:
-    profiles: ["app"]
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        API_URL: http://api:4000
-    restart: unless-stopped
-    depends_on:
-      - api
-    environment:
-      API_URL: http://api:4000
-    ports:
-      - "3000:3000"
 
 volumes:
   pgdata:

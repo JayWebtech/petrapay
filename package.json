@@ -11,6 +11,8 @@
     "dev": "pnpm -r --parallel --filter @petrapay/api --filter @petrapay/web dev",
     "dev:api": "pnpm --filter @petrapay/api dev",
     "dev:web": "pnpm --filter @petrapay/web dev",
+    "build:api": "pnpm --filter @petrapay/api build",
+    "start:api": "pnpm --filter @petrapay/api start:prod",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
