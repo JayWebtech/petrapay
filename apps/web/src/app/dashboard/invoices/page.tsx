@@ -16,6 +16,7 @@ const FILTERS: { value: "all" | InvoiceStatus; label: string }[] = [
   { value: "PROCESSING", label: "Processing" },
   { value: "PAID", label: "Paid" },
   { value: "CANCELLED", label: "Cancelled" },
+  { value: "EXPIRED", label: "Expired" },
 ];
 
 export default function InvoicesPage() {

@@ -1,12 +1,48 @@
 "use client";
 
 import { chainMeta, formatAmount, type PublicInvoiceDTO, type SwapDTO } from "@petrapay/shared";
-import { Check, ExternalLink, Lock } from "lucide-react";
+import { ArrowRight, Check, ExternalLink, Lock } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 import { formatDate } from "@/components/app/invoice-row";
 import { TokenIcon } from "@/components/app/token-icon";
 
-export function PaidState({ invoice, swap }: { invoice: PublicInvoiceDTO; swap: SwapDTO | null }) {
+const REDIRECT_SECONDS = 5;
+
+/** Sends the customer back to the merchant's site. Counts down only right after paying, not on a revisited receipt. */
+function ReturnToMerchant({ invoice, auto }: { invoice: PublicInvoiceDTO; auto: boolean }) {
+  const url = invoice.successUrl!.replaceAll("{CHECKOUT_ID}", encodeURIComponent(invoice.id));
+  const [left, setLeft] = useState(REDIRECT_SECONDS);
+  const [stay, setStay] = useState(!auto);
+
+  useEffect(() => {
+    if (stay) return;
+    if (left <= 0) {
+      window.location.assign(url);
+      return;
+    }
+    const id = window.setTimeout(() => setLeft((n) => n - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [left, stay, url]);
+
+  return (
+    <div className="mt-8">
+      <a href={url} className="btn-solid h-14 w-full text-[15px] font-semibold">
+        Continue to {invoice.creatorName} <ArrowRight className="size-4" />
+      </a>
+      {!stay ? (
+        <p className="mt-3 text-center text-xs text-muted-foreground" aria-live="polite">
+          Taking you back in {left}s ·{" "}
+          <button type="button" onClick={() => setStay(true)} className="font-medium text-foreground underline-offset-2 hover:underline">
+            Stay here
+          </button>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function PaidState({ invoice, swap, justPaid = false }: { invoice: PublicInvoiceDTO; swap: SwapDTO | null; justPaid?: boolean }) {
   const reduce = useReducedMotion();
   const paidAt = swap?.settledAt ?? invoice.paidAt;
   return (
@@ -25,6 +61,8 @@ export function PaidState({ invoice, swap }: { invoice: PublicInvoiceDTO; swap: 
           ? `${formatAmount(swap.amountOutFormatted, 6)} ZEC was delivered privately to ${invoice.creatorName}.`
           : `${invoice.creatorName} has received this payment.`}
       </p>
+      {invoice.successUrl ? <ReturnToMerchant invoice={invoice} auto={justPaid} /> : null}
+
 
       {swap ? (
         <div className="mt-8 rounded-3xl border border-border bg-white p-5 shadow-[0_3px_0_0_#eeedf5]">

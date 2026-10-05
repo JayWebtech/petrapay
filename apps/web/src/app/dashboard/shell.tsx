@@ -4,6 +4,7 @@ import { formatAmount, formatUsd, type InvoiceDTO } from "@petrapay/shared";
 import {
   ArrowUpRight,
   ChevronsUpDown,
+  CodeXml,
   FileText,
   Home,
   KeyRound,
@@ -37,6 +38,7 @@ const NAV: NavItem[] = [
   { href: "/dashboard/links", label: "Payment links", icon: Link2 },
   { href: "/dashboard/withdrawals", label: "Withdrawals", icon: ArrowUpRight, alsoMatches: ["/dashboard/withdraw"] },
   { href: "/dashboard/addresses", label: "Shielded addresses", icon: Shield },
+  { href: "/dashboard/developers", label: "Developers", icon: CodeXml },
 ];
 
 const isActive = (pathname: string, item: NavItem) =>
@@ -69,6 +71,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       { id: "new-link", label: "Create payment link", group: "Actions", icon: Link2, onSelect: go("/dashboard/links/new") },
       { id: "add-addresses", label: "Add shielded addresses", group: "Actions", icon: Shield, onSelect: go("/dashboard/addresses") },
       { id: "withdraw", label: "New withdrawal (ZEC to any chain)", group: "Actions", icon: ArrowUpRight, onSelect: go("/dashboard/withdraw") },
+      { id: "api-keys", label: "Create API key", group: "Actions", icon: CodeXml, onSelect: go("/dashboard/developers") },
       ...NAV.map((n) => ({ id: `nav-${n.href}`, label: `Go to ${n.label}`, group: "Navigation", icon: n.icon, onSelect: go(n.href) })),
       { id: "nav-settings", label: "Go to Settings", group: "Navigation", icon: Settings, onSelect: go("/dashboard/settings") },
       ...invoices.slice(0, 30).map((inv) => ({

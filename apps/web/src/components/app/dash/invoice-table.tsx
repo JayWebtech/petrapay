@@ -93,7 +93,11 @@ export function InvoiceTable({ invoices, compact = false }: { invoices: InvoiceD
               </td>
               <td className="max-w-[260px] px-3 py-3.5">
                 <p className="truncate font-medium">{inv.title}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">#{String(inv.number).padStart(3, "0")}</p>
+                <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                  #{String(inv.number).padStart(3, "0")}
+                  {inv.source === "API" ? <span className="rounded bg-[#eeecfd] px-1 font-sans text-[10px] font-semibold text-primary">API</span> : null}
+                  {inv.reference ? <span className="truncate">{inv.reference}</span> : null}
+                </p>
               </td>
               {!compact ? (
                 <td className="max-w-[180px] truncate px-3 py-3.5 text-muted-foreground">

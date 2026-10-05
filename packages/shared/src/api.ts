@@ -205,7 +205,8 @@ export type QuotePreviewDTO = {
   confidentiality: string;
 };
 
-export type InvoiceStatus = "OPEN" | "PROCESSING" | "PAID" | "CANCELLED";
+export type InvoiceStatus = "OPEN" | "PROCESSING" | "PAID" | "CANCELLED" | "EXPIRED";
+export type InvoiceSource = "DASHBOARD" | "API" | "LINK";
 
 export type LineItem = z.infer<typeof lineItemSchema>;
 
@@ -222,6 +223,11 @@ export type InvoiceDTO = {
   clientName: string | null;
   clientEmail: string | null;
   editedAt: string | null;
+  source: InvoiceSource;
+  /** Merchant order id and key/value pairs, set through the API. */
+  reference: string | null;
+  metadata: Record<string, string> | null;
+  expiresAt: string | null;
   currency: "USD" | "ZEC";
   amount: string;
   lineItems: LineItem[];
@@ -253,6 +259,10 @@ export type PublicInvoiceDTO = {
   creatorName: string;
   /** Set when a payer started this payment from a payment link. */
   linkId: string | null;
+  /** Checkout redirects set by the merchant through the API. */
+  successUrl: string | null;
+  cancelUrl: string | null;
+  expiresAt: string | null;
   /** Present so payers can pay natively from a Zcash wallet. */
   zecDirect: { address: string; amountZec: string; uri: string } | null;
   zecPriceUsd: number | null;
@@ -334,3 +344,115 @@ export type PublicLinkDTO = {
 export type LinkCheckoutDTO = { invoice: PublicInvoiceDTO; swap: SwapDTO | null };
 
 export type ApiError = { error: string; details?: unknown };
+
+// ---------- Merchant API (developers) ----------
+
+export const WEBHOOK_EVENT_TYPES = ["checkout.created", "checkout.processing", "checkout.paid", "checkout.cancelled", "checkout.expired"] as const;
+export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
+
+export const createApiKeySchema = z.object({ name: z.string().trim().min(1, "Name the key").max(60) });
+
+const webhookUrl = z.url({ protocol: /^https?$/, error: "Enter a full http(s) URL" }).max(2000);
+const webhookEvents = z
+  .array(z.union([z.literal("*"), z.enum(WEBHOOK_EVENT_TYPES)]))
+  .min(1, "Pick at least one event")
+  .max(WEBHOOK_EVENT_TYPES.length + 1);
+
+export const createWebhookSchema = z.object({
+  url: webhookUrl,
+  description: z.string().trim().max(200).optional(),
+  events: webhookEvents,
+});
+export const updateWebhookSchema = z.object({
+  url: webhookUrl.optional(),
+  description: z.string().trim().max(200).nullable().optional(),
+  events: webhookEvents.optional(),
+  active: z.boolean().optional(),
+});
+
+export type ApiKeyDTO = {
+  id: string;
+  name: string;
+  /** "pp_sk_…a1b2" */
+  preview: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+/** The only response that ever contains the full secret key. */
+export type CreatedApiKeyDTO = { key: ApiKeyDTO; secret: string };
+
+export type WebhookEndpointDTO = {
+  id: string;
+  url: string;
+  description: string | null;
+  events: string[];
+  active: boolean;
+  createdAt: string;
+  /** Deliveries in the last 7 days. */
+  recent: { total: number; failed: number; pending: number; lastAt: string | null };
+};
+export type WebhookEndpointDetailDTO = WebhookEndpointDTO & { secret: string };
+
+export type WebhookDeliveryDTO = {
+  id: string;
+  eventId: string;
+  eventType: string;
+  status: "PENDING" | "SUCCEEDED" | "FAILED";
+  attempts: number;
+  responseStatus: number | null;
+  responseBody: string | null;
+  createdAt: string;
+  lastAttemptAt: string | null;
+  nextAttemptAt: string | null;
+  payload: unknown;
+};
+
+// ---------- Public API v1 (snake_case, Stripe-style) ----------
+
+const redirectUrl = z.url({ protocol: /^https?$/, error: "Must be a full http(s) URL" }).max(2000);
+
+export const v1LineItemSchema = z.object({
+  description: z.string().trim().min(1).max(200),
+  quantity: z.number().positive().max(1_000_000).default(1),
+  unit_amount: decimalString,
+});
+
+export const v1CreateCheckoutSchema = z
+  .object({
+    currency: z.enum(["USD", "ZEC"]),
+    /** Total to charge. Give either this or line_items. */
+    amount: decimalString.optional(),
+    line_items: z.array(v1LineItemSchema).min(1).max(50).optional(),
+    title: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(2000).optional(),
+    reference: z.string().trim().min(1).max(200).optional(),
+    metadata: z
+      .record(z.string().min(1).max(40), z.string().max(500))
+      .refine((m) => Object.keys(m).length <= 20, "At most 20 metadata keys")
+      .optional(),
+    customer: z.object({ name: z.string().trim().max(120).optional(), email: z.email().max(200).optional() }).optional(),
+    success_url: redirectUrl.optional(),
+    cancel_url: redirectUrl.optional(),
+    /** Seconds until the checkout stops accepting new payments (5 minutes to 7 days, default 24 hours). */
+    expires_in: z
+      .number()
+      .int()
+      .min(300)
+      .max(7 * 86_400)
+      .optional(),
+  })
+  .refine((v) => !!v.amount !== !!v.line_items, { message: "Provide either amount or line_items", path: ["amount"] });
+export type V1CreateCheckoutInput = z.infer<typeof v1CreateCheckoutSchema>;
+
+export const v1CreatePaymentLinkSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(2000).optional(),
+  currency: z.enum(["USD", "ZEC"]),
+  amount_type: z.enum(["fixed", "custom"]),
+  amount: decimalString.optional(),
+  min_amount: decimalString.optional(),
+  max_amount: decimalString.optional(),
+  presets: z.array(decimalString).max(4).optional(),
+});
+export const v1UpdatePaymentLinkSchema = z.object({ active: z.boolean() });

@@ -29,6 +29,11 @@ model Creator {
   invoices  Invoice[]
   swaps     Swap[]
   links     PaymentLink[]
+
+  apiKeys          ApiKey[]
+  webhookEndpoints WebhookEndpoint[]
+  webhookEvents    WebhookEvent[]
+  idempotencyKeys  IdempotencyKey[]
 }
 
 model AuthChallenge {
@@ -75,6 +80,14 @@ enum InvoiceStatus {
   PROCESSING
   PAID
   CANCELLED
+  /// A checkout whose expiresAt passed with no live quote. Money that still arrives marks it PAID.
+  EXPIRED
+}
+
+enum InvoiceSource {
+  DASHBOARD
+  API
+  LINK
 }
 
 enum Currency {
@@ -114,6 +127,16 @@ model Invoice {
   link              PaymentLink?  @relation(fields: [linkId], references: [id], onDelete: SetNull)
   /// Form responses sealed to the creator's box key in the payer's browser ("box1:…").
   responses         String?
+  source            InvoiceSource   @default(DASHBOARD)
+  /// Merchant's own identifier (e.g. an order id), set through the API.
+  reference         String?
+  /// Merchant key/value pairs, echoed back in the API and webhooks.
+  metadata          Json?
+  /// Where the hosted checkout sends the customer after paying / when they back out.
+  successUrl        String?
+  cancelUrl         String?
+  /// After this, no new quotes are issued and the checkout becomes EXPIRED.
+  expiresAt         DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -122,6 +145,8 @@ model Invoice {
   @@unique([creatorId, number])
   @@index([creatorId, status])
   @@index([linkId])
+  @@index([creatorId, reference])
+  @@index([status, expiresAt])
 }
 
 enum LinkAmountType {
@@ -217,4 +242,98 @@ model Swap {
   @@index([status, lastCheckedAt])
   @@index([invoiceId])
   @@index([creatorId, kind])
+}
+
+/// Secret key a merchant's server uses for the public /v1 API. Only a hash is stored.
+model ApiKey {
+  id         String    @id @default(cuid())
+  creatorId  String
+  creator    Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  name       String
+  /// SHA-256 of the full key.
+  hash       String    @unique
+  /// Last characters, to tell keys apart in the dashboard.
+  lastFour   String
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([creatorId])
+}
+
+/// A merchant URL that receives signed event notifications.
+model WebhookEndpoint {
+  /// "we_…"
+  id          String            @id
+  creatorId   String
+  creator     Creator           @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  url         String
+  description String?
+  /// Shared HMAC secret ("whsec_…") the merchant uses to verify signatures.
+  secret      String
+  /// Event types to send, or ["*"] for all.
+  events      String[]
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([creatorId])
+}
+
+/// Something that happened to a merchant's checkout, as delivered to their webhooks.
+model WebhookEvent {
+  /// "evt_…"
+  id        String            @id
+  creatorId String
+  creator   Creator           @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  type      String
+  /// The full event body sent to endpoints.
+  payload   Json
+  createdAt DateTime          @default(now())
+
+  deliveries WebhookDelivery[]
+
+  @@index([creatorId, createdAt])
+}
+
+enum DeliveryStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+/// One event to one endpoint, retried with backoff until it gets a 2xx.
+model WebhookDelivery {
+  id             String          @id @default(cuid())
+  eventId        String
+  event          WebhookEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  endpointId     String
+  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  status         DeliveryStatus  @default(PENDING)
+  attempts       Int             @default(0)
+  nextAttemptAt  DateTime        @default(now())
+  lastAttemptAt  DateTime?
+  responseStatus Int?
+  /// First 1,000 characters of the endpoint's reply, or the network error.
+  responseBody   String?
+  createdAt      DateTime        @default(now())
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+}
+
+/// Replays the first response for a repeated Idempotency-Key, so retried API calls don't create duplicates.
+model IdempotencyKey {
+  creatorId   String
+  creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  key         String
+  /// SHA-256 of method + path + body; reusing a key with a different request is an error.
+  requestHash String
+  statusCode  Int
+  body        Json
+  createdAt   DateTime @default(now())
+
+  @@id([creatorId, key])
 }

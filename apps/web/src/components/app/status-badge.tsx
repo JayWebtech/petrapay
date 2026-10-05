@@ -6,6 +6,7 @@ const INVOICE: Record<InvoiceStatus, { status: AnimatedBadgeStatus; label: strin
   PROCESSING: { status: "loading", label: "Processing" },
   PAID: { status: "success", label: "Paid" },
   CANCELLED: { status: "neutral", label: "Cancelled" },
+  EXPIRED: { status: "neutral", label: "Expired" },
 };
 
 const SWAP: Record<SwapStatus, { status: AnimatedBadgeStatus; label: string }> = {

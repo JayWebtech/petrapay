@@ -13,9 +13,33 @@ import { HttpError } from "../lib/http.ts";
 import { publicId } from "../lib/ids.ts";
 import { getToken } from "./oneclick.ts";
 import { toSwapDTO } from "./swaps.ts";
+import { emitCheckoutEvent } from "./webhooks.ts";
 
 /** Bridge minimum for ZEC withdrawals from NEAR Intents (0.001 ZEC). */
 export const MIN_ZEC_OUT_ZATS = 100_000n;
+
+const DECIMALS = { USD: 2, ZEC: 8 } as const;
+
+/** Rejects amounts finer than the currency allows (cents for USD, zats for ZEC). */
+export function assertPrecision(value: string, currency: "USD" | "ZEC", label = "Amount") {
+  const frac = value.split(".")[1] ?? "";
+  if (frac.length > DECIMALS[currency]) throw new HttpError(400, `${label} can have at most ${DECIMALS[currency]} decimals`);
+}
+
+/** The invoice total for these line items, or a 400 if it's below what the swap route can deliver. */
+export function invoiceTotal(lineItems: LineItem[], currency: "USD" | "ZEC"): string {
+  for (const item of lineItems) assertPrecision(item.unitAmount, currency, "Unit amount");
+  const amount = sumLineItems(lineItems, currency);
+  if (Number(amount) <= 0) throw new HttpError(400, "The total must be greater than zero", { param: "amount" });
+  if (currency === "USD" && Number(amount) < 1) throw new HttpError(400, "The total must be at least $1.00", { param: "amount" });
+  if (currency === "ZEC" && Number(amount) < 0.001) throw new HttpError(400, "The total must be at least 0.001 ZEC", { param: "amount" });
+  return amount;
+}
+
+/** True once a checkout's expiry has passed. */
+export function isPastExpiry(invoice: { expiresAt: Date | null }, now = Date.now()): boolean {
+  return !!invoice.expiresAt && invoice.expiresAt.getTime() <= now;
+}
 
 export function sumLineItems(items: LineItem[], currency: "USD" | "ZEC"): string {
   const decimals = currency === "USD" ? 2 : 8;
@@ -82,6 +106,12 @@ export async function createInvoice(
     dueDate?: Date | null;
     linkId?: string;
     responses?: string | null;
+    source?: "DASHBOARD" | "API" | "LINK";
+    reference?: string | null;
+    metadata?: Record<string, string> | null;
+    successUrl?: string | null;
+    cancelUrl?: string | null;
+    expiresAt?: Date | null;
   },
 ) {
   const { address, reused } = await assignAddress(creatorId);
@@ -109,10 +139,30 @@ export async function createInvoice(
         dueDate: data.dueDate ?? null,
         linkId: data.linkId,
         responses: data.responses || null,
+        source: data.source ?? (data.linkId ? "LINK" : "DASHBOARD"),
+        reference: data.reference ?? null,
+        metadata: data.metadata ?? undefined,
+        successUrl: data.successUrl ?? null,
+        cancelUrl: data.cancelUrl ?? null,
+        expiresAt: data.expiresAt ?? null,
       },
       include: INVOICE_INCLUDE,
     });
   });
+}
+
+/** Cancels an open (or expired) invoice; rejects when money is already moving or has arrived. */
+export async function cancelInvoice(invoice: Pick<Invoice, "id" | "status">) {
+  if (invoice.status === "PAID") throw new HttpError(409, "Paid invoices can't be cancelled");
+  if (invoice.status === "PROCESSING") throw new HttpError(409, "A payment is in flight. Wait for it to settle or refund.");
+  if (invoice.status === "CANCELLED") throw new HttpError(409, "This invoice is already cancelled");
+  const updated = await prisma.invoice.update({
+    where: { id: invoice.id },
+    data: { status: "CANCELLED", cancelledAt: new Date() },
+    include: INVOICE_INCLUDE,
+  });
+  void emitCheckoutEvent(invoice.id, "checkout.cancelled");
+  return updated;
 }
 
 /** Undoes createInvoice when the payment it was for couldn't start, returning the address to the pool. */
@@ -138,6 +188,10 @@ export async function toInvoiceDTO(invoice: InvoiceWithRelations): Promise<Invoi
     clientName: invoice.clientName,
     clientEmail: invoice.clientEmail,
     editedAt: invoice.editedAt?.toISOString() ?? null,
+    source: invoice.source,
+    reference: invoice.reference,
+    metadata: (invoice.metadata as Record<string, string> | null) ?? null,
+    expiresAt: invoice.expiresAt?.toISOString() ?? null,
     currency: invoice.currency,
     amount: invoice.amount.toString(),
     lineItems: invoice.lineItems as LineItem[],
@@ -158,7 +212,8 @@ export async function toPublicInvoiceDTO(
 ): Promise<PublicInvoiceDTO> {
   let zecDirect: PublicInvoiceDTO["zecDirect"] = null;
   let zecPriceUsd: number | null = null;
-  if (invoice.status === "OPEN") {
+  // Expired checkouts stop offering a direct ZEC address too.
+  if (invoice.status === "OPEN" && !isPastExpiry(invoice)) {
     try {
       const { zats, zecPriceUsd: price } = await invoiceZats(invoice);
       zecPriceUsd = price;
@@ -192,6 +247,9 @@ export async function toPublicInvoiceDTO(
     createdAt: invoice.createdAt.toISOString(),
     creatorName: invoice.creator.displayName ?? "A PetraPay creator",
     linkId: invoice.linkId,
+    successUrl: invoice.successUrl,
+    cancelUrl: invoice.cancelUrl,
+    expiresAt: invoice.expiresAt?.toISOString() ?? null,
     zecDirect,
     zecPriceUsd,
   };

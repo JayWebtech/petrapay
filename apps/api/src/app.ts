@@ -6,9 +6,11 @@ import { env } from "./env.ts";
 import { HttpError } from "./lib/http.ts";
 import { addressRoutes } from "./routes/addresses.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { developerRoutes } from "./routes/developers.ts";
 import { invoiceRoutes } from "./routes/invoices.ts";
 import { linkRoutes, publicLinkRoutes } from "./routes/links.ts";
 import { publicRoutes } from "./routes/public.ts";
+import { v1Routes } from "./routes/v1.ts";
 import { withdrawalRoutes } from "./routes/withdrawals.ts";
 
 export async function buildApp(opts: { logger?: boolean } = {}) {
@@ -50,6 +52,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   await app.register(invoiceRoutes);
   await app.register(linkRoutes);
   await app.register(withdrawalRoutes);
+  await app.register(developerRoutes);
+  // Public merchant API (secret-key auth, Stripe-style errors).
+  await app.register(v1Routes, { prefix: "/v1" });
 
   return app;
 }

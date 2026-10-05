@@ -39,6 +39,7 @@ export function InvoicePill({ status, dueDate = null }: { status: InvoiceStatus;
   if (status === "PAID") return <Pill tone="success">Paid</Pill>;
   if (status === "PROCESSING") return <Pill tone="progress">Processing</Pill>;
   if (status === "CANCELLED") return <Pill tone="neutral">Cancelled</Pill>;
+  if (status === "EXPIRED") return <Pill tone="neutral" icon={<Clock className="size-3" strokeWidth={2.5} />}>Expired</Pill>;
   return <Pill tone="info">Open</Pill>;
 }
 

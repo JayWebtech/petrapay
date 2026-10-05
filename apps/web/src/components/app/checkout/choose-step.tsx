@@ -19,6 +19,7 @@ export function ChooseStep({
   onBrowse,
   onZec,
   onBack,
+  backLabel,
   zecPending = false,
 }: {
   payee: string;
@@ -29,6 +30,7 @@ export function ChooseStep({
   onBrowse: () => void;
   onZec: () => void;
   onBack?: () => void;
+  backLabel?: string;
   zecPending?: boolean;
 }) {
   const reduce = useReducedMotion();
@@ -47,6 +49,7 @@ export function ChooseStep({
     <div>
       <StepHeader
         onBack={onBack}
+        backLabel={backLabel}
         icon={<Wallet className="size-6 text-foreground" />}
         title={`Pay ${payee}`}
         body="Use any token you already hold. You'll see the exact amount, fees included, before anything is sent."

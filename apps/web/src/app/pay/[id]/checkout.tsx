@@ -1,13 +1,14 @@
 "use client";
 
 import { ZEC_ASSET_ID, type PublicInvoiceDTO, type QuotePreviewDTO, type SwapDTO, type TokenDTO } from "@petrapay/shared";
-import { XCircle } from "lucide-react";
+import { ArrowLeft, Clock, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ChooseStep } from "@/components/app/checkout/choose-step";
 import { CheckoutFrame } from "@/components/app/checkout/frame";
 import { ReviewStep } from "@/components/app/checkout/review-step";
 import { paymentKey, rememberPayment } from "@/components/app/checkout/storage";
 import { StepHeader, estimateIn, invoiceUsd } from "@/components/app/checkout/utils";
+import { useNow } from "@/components/app/countdown";
 import { TokenSelector } from "@/components/app/token-selector";
 import { Loader } from "@/components/motion/loader";
 import { useTokens } from "@/hooks/use-tokens";
@@ -27,6 +28,7 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
   const [view, setView] = useState<View>(initialView);
   const [token, setToken] = useState<TokenDTO | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const now = useNow(15_000);
   const [swap, setSwap] = useState<SwapDTO | null>(null);
   // True until we've checked for a payment this browser already started.
   const [resuming, setResuming] = useState(initial.status !== "PAID" && initial.status !== "CANCELLED");
@@ -72,7 +74,10 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
 
   const paid = invoice.status === "PAID" || swap?.status === "SUCCESS";
   const cancelled = invoice.status === "CANCELLED" && !swap;
-  const stage = resuming ? "resuming" : paid ? "paid" : cancelled ? "cancelled" : swap ? "deposit" : view;
+  // Checkouts created through the API expire; one already being paid carries on.
+  const expired = !swap && (invoice.status === "EXPIRED" || (invoice.status === "OPEN" && !!invoice.expiresAt && Date.parse(invoice.expiresAt) <= now));
+  const stage = resuming ? "resuming" : paid ? "paid" : cancelled ? "cancelled" : expired ? "expired" : swap ? "deposit" : view;
+  const backToStore = invoice.cancelUrl ? () => window.location.assign(invoice.cancelUrl!) : undefined;
   const usd = invoiceUsd(invoice);
 
   return (
@@ -97,7 +102,20 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
           <Loader variant="dots" size={22} />
         </div>
       ) : stage === "paid" ? (
-        <PaidState invoice={invoice} swap={swap} />
+        <PaidState invoice={invoice} swap={swap} justPaid={initial.status !== "PAID"} />
+      ) : stage === "expired" ? (
+        <div>
+          <StepHeader
+            icon={<Clock className="size-6 text-muted-foreground" />}
+            title="This checkout has expired"
+            body={`Head back to ${invoice.creatorName} to start a new one. Nothing was charged.`}
+          />
+          {backToStore ? (
+            <button type="button" onClick={backToStore} className="btn-solid mt-8 h-14 w-full text-[15px] font-semibold">
+              <ArrowLeft className="size-4" /> Back to {invoice.creatorName}
+            </button>
+          ) : null}
+        </div>
       ) : stage === "cancelled" ? (
         <StepHeader
           icon={<XCircle className="size-6 text-muted-foreground" />}
@@ -137,6 +155,8 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
           onPick={pick}
           onBrowse={() => setSelectorOpen(true)}
           onZec={() => setView("zec")}
+          onBack={backToStore}
+          backLabel={`Back to ${invoice.creatorName}`}
         />
       )}
     </CheckoutFrame>

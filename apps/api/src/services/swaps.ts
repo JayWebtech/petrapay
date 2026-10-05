@@ -1,6 +1,7 @@
 import { TERMINAL_SWAP_STATUSES, type SwapDTO, type SwapStatus, type TxLink } from "@petrapay/shared";
 import { Prisma, prisma, type Swap, type SwapKind } from "../db.ts";
 import { getStatus, getToken, type GetExecutionStatusResponse, type QuoteResponse } from "./oneclick.ts";
+import { emitCheckoutEvent } from "./webhooks.ts";
 
 
 type SwapDetails = GetExecutionStatusResponse["swapDetails"];
@@ -135,11 +136,15 @@ export async function recomputeInvoice(invoiceId: string) {
       where: { id: invoiceId },
       data: { status: "PAID", paidAt: invoice.paidAt ?? paidAt, receivedZats: zats, receivedUsd: usd.toFixed(2) },
     });
+    if (invoice.status !== "PAID") await emitCheckoutEvent(invoiceId, "checkout.paid");
     return;
   }
 
-  if (invoice.status === "CANCELLED" || invoice.status === "PAID") return;
+  if (invoice.status === "CANCELLED" || invoice.status === "PAID" || invoice.status === "EXPIRED") return;
   const inFlight = invoice.swaps.some((s) => ["KNOWN_DEPOSIT_TX", "PROCESSING", "INCOMPLETE_DEPOSIT"].includes(s.status));
   const next = inFlight ? "PROCESSING" : "OPEN";
-  if (next !== invoice.status) await prisma.invoice.update({ where: { id: invoiceId }, data: { status: next } });
+  if (next !== invoice.status) {
+    await prisma.invoice.update({ where: { id: invoiceId }, data: { status: next } });
+    if (next === "PROCESSING") await emitCheckoutEvent(invoiceId, "checkout.processing");
+  }
 }

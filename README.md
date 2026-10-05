@@ -21,6 +21,13 @@ Client wallet ──(USDC on Base)──▶ 1Click deposit address ──▶ NEA
 - Live dashboard: shielded ZEC received, outstanding, 30-day chart, payment attempts per invoice.
 - **Withdrawals:** swap ZEC → any token on any NEAR Intents chain. The UI shows a ZIP-321 QR for Zashi; refunds go back to a shielded address.
 
+**Merchants (API)**
+- **Secret API keys** (`pp_sk_…`), shown once and stored as SHA-256 hashes; create and revoke them under Dashboard → Developers.
+- **Public REST API** at `/api/v1` (Stripe-style: snake_case objects, `starting_after` pagination, `{ error: { type, message, param } }` errors, `Idempotency-Key` on POSTs). Create checkouts with an amount or line items, your own `reference` and `metadata`, the customer's name/email, `success_url` / `cancel_url` (with `{CHECKOUT_ID}`), and an expiry; list, retrieve and cancel them; manage payment links.
+- **Hosted checkout**: redirect customers to the checkout's `url`; after paying they're sent back to `success_url`.
+- **Signed webhooks** (`checkout.created`, `.processing`, `.paid`, `.cancelled`, `.expired`) with an HMAC-SHA256 `PetraPay-Signature` header, retries with backoff for about two days, a delivery log with payloads, resend, and test events. Webhook URLs must be public https addresses (private/loopback targets are blocked unless `WEBHOOK_ALLOW_PRIVATE=true`).
+- Full reference with code samples at `/docs`.
+
 **Payers**
 - Pick any token from 100+ assets. See a live quote (amount, USD value, ETA) before committing.
 - One-click **Pay with wallet** for EVM chains (MetaMask, Rabby…) and Solana (Phantom, Solflare, Backpack), or scan an EIP-681 / Solana Pay / BIP-21 QR, or copy the address.
@@ -85,6 +92,7 @@ Open http://localhost:3000, create an account, add a few unified addresses from 
 | `SLIPPAGE_BPS` | Quote slippage in basis points (default 100) |
 | `APP_FEE_BPS` / `APP_FEE_RECIPIENT` | Optional platform fee and the NEAR account that receives it |
 | `POLL_INTERVAL_MS` / `WORKER_ENABLED` | Status worker cadence / toggle |
+| `WEBHOOK_ALLOW_PRIVATE` | `true` allows http and private/loopback webhook URLs, for testing locally. Off by default; never enable it in production |
 
 Web: `API_URL` (where `/api` is proxied) and `NEXT_PUBLIC_SOLANA_RPC_URL` (use a real RPC provider in production; the public endpoint rate-limits browsers).
 

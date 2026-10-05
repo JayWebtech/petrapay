@@ -23,6 +23,11 @@ const schema = z
       .optional()
       .transform((v) => v !== "false"),
     POLL_INTERVAL_MS: z.coerce.number().int().min(2000).default(8000),
+    /**
+     * Let webhook URLs use plain http and point at private/loopback addresses. Off unless set, so a
+     * merchant-supplied URL can never reach into the server's own network; turn it on for local testing.
+     */
+    WEBHOOK_ALLOW_PRIVATE: bool,
   })
   .superRefine((env, ctx) => {
     if (env.ONECLICK_CONFIDENTIALITY !== "public" && !env.ONECLICK_JWT) {

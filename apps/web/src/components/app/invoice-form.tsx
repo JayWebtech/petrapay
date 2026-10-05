@@ -46,6 +46,7 @@ export function editBlocker(invoice: InvoiceDTO): string | null {
   if (invoice.link) return "Payments made through a payment link can't be edited.";
   if (invoice.status === "PAID") return "Paid invoices can't be edited.";
   if (invoice.status === "CANCELLED") return "Cancelled invoices can't be edited.";
+  if (invoice.status === "EXPIRED") return "Expired checkouts can't be edited.";
   if (invoice.status === "PROCESSING") return "A payment is in flight. You can edit once it settles or is refunded.";
   return null;
 }

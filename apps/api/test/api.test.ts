@@ -9,6 +9,11 @@ import { prisma } from "../src/db.ts";
 import { publicId } from "../src/lib/ids.ts";
 import { sumLineItems } from "../src/services/invoices.ts";
 import { recomputeInvoice } from "../src/services/swaps.ts";
+import { createHmac } from "node:crypto";
+import { createServer, type IncomingMessage, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { deliverDueWebhooks, isBlockedAddress } from "../src/services/webhooks.ts";
+import { expireCheckouts } from "../src/worker.ts";
 
 // Mainnet unified addresses from the official ZIP-316 test vectors.
 const vectors: { ua: string; orchard: boolean; transparent: boolean; unknown: number | null }[] = JSON.parse(
@@ -29,11 +34,13 @@ after(async () => {
 
 /** Signs in with a fresh ed25519 key and returns a cookie-carrying request helper. */
 async function signIn() {
+  // Each test account signs in from its own address, as real users would; auth is rate limited per IP.
+  const ip = { "x-forwarded-for": `198.51.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}` };
   const sk = ed25519.utils.randomSecretKey();
   const publicKey = bytesToHex(ed25519.getPublicKey(sk));
-  const challenge = (await app.inject({ method: "POST", url: "/auth/challenge" })).json() as { nonce: string; message: string };
+  const challenge = (await app.inject({ method: "POST", url: "/auth/challenge", headers: ip })).json() as { nonce: string; message: string };
   const signature = bytesToHex(ed25519.sign(new TextEncoder().encode(challenge.message), sk));
-  const res = await app.inject({ method: "POST", url: "/auth/verify", payload: { publicKey, signature, nonce: challenge.nonce } });
+  const res = await app.inject({ method: "POST", url: "/auth/verify", payload: { publicKey, signature, nonce: challenge.nonce }, headers: ip });
   assert.equal(res.statusCode, 200);
   const cookie = res.cookies.find((c) => c.name === "pp_session");
   assert.ok(cookie, "session cookie set");
@@ -434,5 +441,245 @@ describe("editing invoices and client details", () => {
 
     const other = await signIn();
     assert.equal((await other.call("PUT", `/invoices/${second.inv.id}`, invoiceBody)).statusCode, 404);
+  });
+});
+
+describe("merchant API", () => {
+  /** A merchant with an address pool and a secret key; `v1` calls the public API with it. */
+  async function merchant() {
+    const creator = await signIn();
+    await creator.call("POST", "/addresses", { addresses: ORCHARD.slice(0, 3) });
+    const created = await creator.call("POST", "/api-keys", { name: "Store backend" });
+    assert.equal(created.statusCode, 201, created.body);
+    const { secret, key } = created.json();
+    const v1 = (method: "GET" | "POST", url: string, payload?: unknown, headers: Record<string, string> = {}) =>
+      app.inject({ method, url: `/v1${url}`, payload: payload as object, headers: { authorization: `Bearer ${secret}`, ...headers } });
+    return { ...creator, secret, key, v1 };
+  }
+
+  const checkoutBody = { currency: "USD", amount: "49.99", title: "Order #1001", reference: "order_1001", metadata: { cart: "abc" } };
+
+  test("keys are shown once, hashed at rest, and revocable", async () => {
+    const m = await merchant();
+    assert.match(m.secret, /^pp_sk_[A-Za-z0-9_-]{43}$/);
+    const list = (await m.call("GET", "/api-keys")).json();
+    assert.equal(list.length, 1);
+    assert.ok(!JSON.stringify(list).includes(m.secret), "the secret is never listed");
+    const stored = await prisma.apiKey.findUniqueOrThrow({ where: { id: m.key.id } });
+    assert.notEqual(stored.hash, m.secret);
+
+    assert.equal((await m.v1("GET", "/checkouts")).statusCode, 200);
+    await m.call("DELETE", `/api-keys/${m.key.id}`);
+    const revoked = await m.v1("GET", "/checkouts");
+    assert.equal(revoked.statusCode, 401);
+    assert.equal(revoked.json().error.type, "authentication_error");
+  });
+
+  test("requests without a valid key are rejected", async () => {
+    const none = await app.inject({ method: "GET", url: "/v1/checkouts" });
+    assert.equal(none.statusCode, 401);
+    assert.equal(none.json().error.type, "authentication_error");
+    const bogus = await app.inject({ method: "GET", url: "/v1/checkouts", headers: { authorization: `Bearer pp_sk_${"x".repeat(43)}` } });
+    assert.equal(bogus.statusCode, 401);
+  });
+
+  test("creates a checkout with a hosted URL, expiry and merchant data", async () => {
+    const m = await merchant();
+    const res = await m.v1("POST", "/checkouts", { ...checkoutBody, customer: { email: "buyer@example.com" }, success_url: "https://shop.test/thanks?c={CHECKOUT_ID}" });
+    assert.equal(res.statusCode, 201, res.body);
+    const c = res.json();
+    assert.equal(c.object, "checkout");
+    assert.equal(c.status, "open");
+    assert.equal(c.amount, "49.99");
+    assert.equal(c.source, "api");
+    assert.equal(c.reference, "order_1001");
+    assert.deepEqual(c.metadata, { cart: "abc" });
+    assert.equal(c.customer.email, "buyer@example.com");
+    assert.match(c.url, new RegExp(`/pay/${c.id}$`));
+    const hours = (new Date(c.expires_at).getTime() - Date.now()) / 3_600_000;
+    assert.ok(hours > 23.9 && hours <= 24, "expires in 24 hours by default");
+
+    // The hosted page knows where to send the customer.
+    const pub = (await app.inject({ method: "GET", url: `/public/invoices/${c.id}` })).json();
+    assert.equal(pub.successUrl, "https://shop.test/thanks?c={CHECKOUT_ID}");
+
+    const lines = await m.v1("POST", "/checkouts", {
+      currency: "USD",
+      title: "Cart",
+      line_items: [
+        { description: "Mug", quantity: 2, unit_amount: "12.50" },
+        { description: "Poster", unit_amount: "20" },
+      ],
+    });
+    assert.equal(lines.json().amount, "45");
+  });
+
+  test("validation errors name the parameter", async () => {
+    const m = await merchant();
+    const both = await m.v1("POST", "/checkouts", { ...checkoutBody, line_items: [{ description: "x", unit_amount: "1" }] });
+    assert.equal(both.statusCode, 400);
+    assert.equal(both.json().error.type, "invalid_request_error");
+    assert.equal(both.json().error.param, "amount");
+    const badUrl = await m.v1("POST", "/checkouts", { ...checkoutBody, success_url: "javascript:alert(1)" });
+    assert.equal(badUrl.json().error.param, "success_url");
+    assert.equal((await m.v1("POST", "/checkouts", { ...checkoutBody, amount: "0.50" })).statusCode, 400);
+    assert.equal((await m.v1("POST", "/checkouts", { ...checkoutBody, amount: "10.001" })).statusCode, 400);
+    assert.equal((await m.v1("GET", "/nope")).statusCode, 404);
+  });
+
+  test("Idempotency-Key replays the first response", async () => {
+    const m = await merchant();
+    const headers = { "idempotency-key": "order_1001_attempt" };
+    const first = await m.v1("POST", "/checkouts", checkoutBody, headers);
+    const again = await m.v1("POST", "/checkouts", checkoutBody, headers);
+    assert.equal(again.statusCode, 201);
+    assert.equal(again.json().id, first.json().id);
+    assert.equal(again.headers["idempotent-replayed"], "true");
+    const different = await m.v1("POST", "/checkouts", { ...checkoutBody, amount: "10" }, headers);
+    assert.equal(different.statusCode, 400);
+    assert.equal(different.json().error.type, "idempotency_error");
+    assert.equal(await prisma.invoice.count({ where: { reference: "order_1001", creator: { apiKeys: { some: { id: m.key.id } } } } }), 1);
+  });
+
+  test("lists paginate with starting_after and filter by reference", async () => {
+    const m = await merchant();
+    for (const ref of ["a", "b", "c"]) await m.v1("POST", "/checkouts", { ...checkoutBody, reference: ref });
+    const page1 = (await m.v1("GET", "/checkouts?limit=2")).json();
+    assert.equal(page1.object, "list");
+    assert.equal(page1.data.length, 2);
+    assert.equal(page1.has_more, true);
+    const page2 = (await m.v1("GET", `/checkouts?limit=2&starting_after=${page1.data[1].id}`)).json();
+    assert.equal(page2.data.length, 1);
+    assert.equal(page2.has_more, false);
+    assert.equal((await m.v1("GET", "/checkouts?reference=b")).json().data[0].reference, "b");
+
+    // Another merchant's ids are invisible.
+    const other = await merchant();
+    assert.equal((await other.v1("GET", `/checkouts/${page1.data[0].id}`)).statusCode, 404);
+  });
+
+  test("checkouts expire, then refuse new quotes", async () => {
+    const m = await merchant();
+    const c = (await m.v1("POST", "/checkouts", { ...checkoutBody, expires_in: 300 })).json();
+    await prisma.invoice.update({ where: { id: c.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    assert.equal((await m.v1("GET", `/checkouts/${c.id}`)).json().status, "expired", "reported expired before the sweep");
+    await expireCheckouts({ info: () => undefined });
+    assert.equal((await prisma.invoice.findUniqueOrThrow({ where: { id: c.id } })).status, "EXPIRED");
+    const quote = await app.inject({ method: "POST", url: `/public/invoices/${c.id}/quote`, payload: { originAsset: "nep141:sol.omft.near", dry: true } });
+    assert.equal(quote.statusCode, 409);
+  });
+
+  test("payment links can be created and paused through the API", async () => {
+    const m = await merchant();
+    const res = await m.v1("POST", "/payment_links", { title: "Tip jar", currency: "USD", amount_type: "custom", min_amount: "2", presets: ["5", "10"] });
+    assert.equal(res.statusCode, 201, res.body);
+    const link = res.json();
+    assert.equal(link.object, "payment_link");
+    assert.match(link.url, new RegExp(`/l/${link.id}$`));
+    assert.equal((await m.v1("POST", "/payment_links", { title: "Tee", currency: "USD", amount_type: "fixed" })).json().error.param, "amount");
+    assert.equal((await m.v1("POST", `/payment_links/${link.id}`, { active: false })).json().active, false);
+  });
+
+  test("private and loopback webhook targets are blocked", () => {
+    for (const ip of ["127.0.0.1", "10.1.2.3", "172.20.0.5", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "fe80::1", "::ffff:10.0.0.1"]) {
+      assert.equal(isBlockedAddress(ip), true, ip);
+    }
+    for (const ip of ["8.8.8.8", "1.1.1.1", "2606:4700:4700::1111"]) assert.equal(isBlockedAddress(ip), false, ip);
+  });
+
+  describe("webhooks", () => {
+    let server: Server;
+    let url: string;
+    let status = 200;
+    const received: { headers: IncomingMessage["headers"]; body: string }[] = [];
+
+    before(async () => {
+      server = createServer((req, res) => {
+        let body = "";
+        req.on("data", (c) => (body += c));
+        req.on("end", () => {
+          received.push({ headers: req.headers, body });
+          res.writeHead(status).end(status === 200 ? "ok" : "nope");
+        });
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+      url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/hooks`;
+    });
+    after(() => new Promise<void>((r) => server.close(() => r())));
+
+    /** Waits for fire-and-forget events to be queued, then delivers them. */
+    async function flush(endpointId: string, count: number) {
+      for (let i = 0; i < 50; i++) {
+        if ((await prisma.webhookDelivery.count({ where: { endpointId } })) >= count) break;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      await deliverDueWebhooks();
+    }
+
+    test("delivers subscribed events, signed with the endpoint secret", async () => {
+      const m = await merchant();
+      const ep = (await m.call("POST", "/webhooks", { url, events: ["checkout.paid", "checkout.cancelled"] })).json();
+      assert.match(ep.secret, /^whsec_/);
+
+      const c = (await m.v1("POST", "/checkouts", checkoutBody)).json();
+      await m.call("POST", `/invoices/${c.id}/mark-paid`);
+      received.length = 0;
+      await flush(ep.id, 1);
+
+      assert.equal(received.length, 1, "checkout.created isn't subscribed, checkout.paid is");
+      const { headers, body } = received[0]!;
+      const event = JSON.parse(body);
+      assert.equal(event.type, "checkout.paid");
+      assert.equal(event.data.object.id, c.id);
+      assert.equal(event.data.object.status, "paid");
+      assert.equal(event.data.object.reference, "order_1001");
+      assert.equal(headers["petrapay-event-id"], event.id);
+
+      const [t, v1] = String(headers["petrapay-signature"]).split(",").map((p) => p.split("=")[1]);
+      assert.equal(v1, createHmac("sha256", ep.secret).update(`${t}.${body}`).digest("hex"));
+      assert.ok(Math.abs(Date.now() / 1000 - Number(t)) < 60);
+
+      const deliveries = (await m.call("GET", `/webhooks/${ep.id}/deliveries`)).json();
+      assert.equal(deliveries[0].status, "SUCCEEDED");
+      assert.equal(deliveries[0].responseStatus, 200);
+    });
+
+    test("failed deliveries are retried with backoff, and can be resent", async () => {
+      const m = await merchant();
+      const ep = (await m.call("POST", "/webhooks", { url, events: ["*"] })).json();
+      status = 500;
+      const c = (await m.v1("POST", "/checkouts", checkoutBody)).json();
+      await flush(ep.id, 1);
+      const [failed] = (await m.call("GET", `/webhooks/${ep.id}/deliveries`)).json();
+      assert.equal(failed.status, "PENDING");
+      assert.equal(failed.attempts, 1);
+      assert.equal(failed.responseStatus, 500);
+      const wait = new Date(failed.nextAttemptAt).getTime() - Date.now();
+      assert.ok(wait > 50_000 && wait <= 60_000, "next try in about a minute");
+
+      status = 200;
+      const retried = (await m.call("POST", `/webhooks/${ep.id}/deliveries/${failed.id}/retry`)).json();
+      assert.equal(retried.status, "SUCCEEDED");
+      assert.equal(retried.attempts, 2);
+      assert.equal(JSON.parse(received.at(-1)!.body).data.object.id, c.id);
+    });
+
+    test("test events reach only the chosen endpoint", async () => {
+      const m = await merchant();
+      const ep = (await m.call("POST", "/webhooks", { url, events: ["checkout.paid"] })).json();
+      received.length = 0;
+      const result = (await m.call("POST", `/webhooks/${ep.id}/test`)).json();
+      assert.equal(result.status, "SUCCEEDED");
+      assert.equal(result.eventType, "ping");
+      assert.equal(JSON.parse(received[0]!.body).type, "ping");
+    });
+
+    test("endpoints are scoped to their merchant", async () => {
+      const m = await merchant();
+      const ep = (await m.call("POST", "/webhooks", { url, events: ["*"] })).json();
+      const other = await signIn();
+      assert.equal((await other.call("GET", `/webhooks/${ep.id}`)).statusCode, 404);
+      assert.equal((await other.call("POST", `/webhooks/${ep.id}/test`)).statusCode, 404);
+    });
   });
 });

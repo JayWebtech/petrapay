@@ -1,7 +1,7 @@
 import { ZEC_ASSET_ID, fromBaseUnits, quoteDeadline, type QuotePreviewDTO, type SwapDTO, type TokenDTO } from "@petrapay/shared";
 import { prisma, type Invoice, type ShieldedAddress } from "../db.ts";
 import { HttpError } from "../lib/http.ts";
-import { MIN_ZEC_OUT_ZATS, invoiceZats } from "./invoices.ts";
+import { MIN_ZEC_OUT_ZATS, invoiceZats, isPastExpiry } from "./invoices.ts";
 import { QuoteRequest, requestQuote, requireToken, type QuoteResponse } from "./oneclick.ts";
 import { createSwap, toSwapDTO } from "./swaps.ts";
 
@@ -64,6 +64,7 @@ export async function quoteInvoicePayment(
 ): Promise<QuotePreviewDTO | SwapDTO> {
   if (invoice.status === "PAID") throw new HttpError(409, "This invoice has already been paid.");
   if (invoice.status === "CANCELLED") throw new HttpError(409, "This invoice was cancelled by the creator.");
+  if (invoice.status === "EXPIRED" || (invoice.status === "OPEN" && isPastExpiry(invoice))) throw new HttpError(409, "This checkout has expired.");
   const origin = await payableToken(body.originAsset);
   const { zats } = await invoiceZats(invoice);
   if (!body.dry && !body.refundTo) throw new HttpError(400, `Enter your ${origin.symbol} refund address`);

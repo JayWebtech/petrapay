@@ -2,6 +2,29 @@ import type { FastifyBaseLogger } from "fastify";
 import { prisma } from "./db.ts";
 import { env } from "./env.ts";
 import { refreshSwap } from "./services/swaps.ts";
+import { deliverDueWebhooks, emitCheckoutEvent } from "./services/webhooks.ts";
+
+const WEBHOOK_TICK_MS = 3_000;
+
+/**
+ * Open checkouts past their expiry become EXPIRED, unless a customer still holds a live quote
+ * (they could pay any moment; the sweep waits for that quote to lapse).
+ */
+export async function expireCheckouts(log: Pick<FastifyBaseLogger, "info">) {
+  const now = new Date();
+  const due = await prisma.invoice.findMany({
+    where: { status: "OPEN", expiresAt: { lte: now }, swaps: { none: { status: "PENDING_DEPOSIT", deadline: { gt: now } } } },
+    select: { id: true },
+    take: 50,
+  });
+  for (const { id } of due) {
+    const res = await prisma.invoice.updateMany({ where: { id, status: "OPEN" }, data: { status: "EXPIRED" } });
+    if (res.count === 1) {
+      log.info({ invoice: id }, "checkout expired");
+      await emitCheckoutEvent(id, "checkout.expired");
+    }
+  }
+}
 
 const BATCH = 25;
 /**
@@ -65,7 +88,27 @@ export function startWorker(log: FastifyBaseLogger) {
     }
   };
 
+  // Merchant-facing work runs on its own loop so a slow webhook endpoint never delays payment status.
+  let housekeeping = false;
+  const merchantTick = async () => {
+    if (housekeeping) return;
+    housekeeping = true;
+    try {
+      await expireCheckouts(log);
+      await deliverDueWebhooks();
+    } catch (err) {
+      log.error({ err }, "webhook/expiry tick failed");
+    } finally {
+      housekeeping = false;
+    }
+  };
+
   const timer = setInterval(tick, Math.max(2000, Math.floor(env.POLL_INTERVAL_MS / 2)));
+  const merchantTimer = setInterval(merchantTick, WEBHOOK_TICK_MS);
   void tick();
-  return () => clearInterval(timer);
+  void merchantTick();
+  return () => {
+    clearInterval(timer);
+    clearInterval(merchantTimer);
+  };
 }

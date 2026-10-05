@@ -1,21 +1,13 @@
-import { createInvoiceSchema, updateInvoiceSchema, type LineItem } from "@petrapay/shared";
+import { createInvoiceSchema, updateInvoiceSchema } from "@petrapay/shared";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.ts";
 import { HttpError, notFound, parseBody } from "../lib/http.ts";
 import { creatorOf, requireCreator } from "../services/auth.ts";
-import { INVOICE_INCLUDE, createInvoice, sumLineItems, toInvoiceDTO } from "../services/invoices.ts";
+import { INVOICE_INCLUDE, cancelInvoice, createInvoice, invoiceTotal, toInvoiceDTO } from "../services/invoices.ts";
 import { isTerminal, refreshSwap } from "../services/swaps.ts";
+import { emitCheckoutEvent } from "../services/webhooks.ts";
 
 const STATUSES = ["OPEN", "PROCESSING", "PAID", "CANCELLED"] as const;
-
-/** The invoice total for these line items, or a 400 if it's below what the swap route can deliver. */
-function invoiceTotal(lineItems: LineItem[], currency: "USD" | "ZEC"): string {
-  const amount = sumLineItems(lineItems, currency);
-  if (Number(amount) <= 0) throw new HttpError(400, "Invoice total must be greater than zero");
-  if (currency === "USD" && Number(amount) < 1) throw new HttpError(400, "USD invoices must be at least $1.00");
-  if (currency === "ZEC" && Number(amount) < 0.001) throw new HttpError(400, "ZEC invoices must be at least 0.001 ZEC");
-  return amount;
-}
 
 export async function invoiceRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireCreator);
@@ -48,6 +40,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
       amount,
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
     });
+    void emitCheckoutEvent(invoice.id, "checkout.created");
     reply.status(201);
     return toInvoiceDTO(invoice);
   });
@@ -78,6 +71,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
     if (invoice.linkId) throw new HttpError(409, "Payments made through a payment link can't be edited.");
     if (invoice.status === "PAID") throw new HttpError(409, "Paid invoices can't be edited.");
     if (invoice.status === "CANCELLED") throw new HttpError(409, "Cancelled invoices can't be edited.");
+    if (invoice.status === "EXPIRED") throw new HttpError(409, "Expired checkouts can't be edited.");
     if (invoice.status === "PROCESSING") throw new HttpError(409, "A payment is in flight. You can edit once it settles or is refunded.");
 
     const amount = invoiceTotal(body.lineItems, body.currency);
@@ -115,13 +109,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>("/invoices/:id/cancel", async (req) => {
     const invoice = await prisma.invoice.findFirst({ where: { id: req.params.id, creatorId: creatorOf(req).id } });
     if (!invoice) throw notFound("Invoice not found");
-    if (invoice.status === "PAID") throw new HttpError(409, "Paid invoices can't be cancelled");
-    if (invoice.status === "PROCESSING") throw new HttpError(409, "A payment is in flight. Wait for it to settle or refund.");
-    const updated = await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { status: "CANCELLED", cancelledAt: new Date() },
-      include: INVOICE_INCLUDE,
-    });
+    const updated = await cancelInvoice(invoice);
     return toInvoiceDTO(updated);
   });
 
@@ -135,6 +123,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
       data: { status: "PAID", paidAt: new Date() },
       include: INVOICE_INCLUDE,
     });
+    void emitCheckoutEvent(invoice.id, "checkout.paid");
     return toInvoiceDTO(updated);
   });
 }

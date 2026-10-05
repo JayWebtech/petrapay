@@ -14,20 +14,12 @@ import {
 import type { FastifyInstance } from "fastify";
 import { prisma, type PaymentLink } from "../db.ts";
 import { HttpError, badRequest, notFound, parseBody } from "../lib/http.ts";
-import { publicId } from "../lib/ids.ts";
 import { creatorOf, requireCreator } from "../services/auth.ts";
 import { INVOICE_INCLUDE, createInvoice, discardInvoice, toInvoiceDTO, toPublicInvoiceDTO } from "../services/invoices.ts";
+import { checkPrecision, createPaymentLink } from "../services/links.ts";
 import { getToken } from "../services/oneclick.ts";
+import { emitCheckoutEvent } from "../services/webhooks.ts";
 import { previewPayment, quoteInvoicePayment } from "../services/payments.ts";
-
-const MIN = { USD: 1, ZEC: 0.001 } as const;
-const DECIMALS = { USD: 2, ZEC: 8 } as const;
-
-function checkPrecision(value: string, currency: "USD" | "ZEC", label: string) {
-  const frac = value.split(".")[1] ?? "";
-  if (frac.length > DECIMALS[currency]) throw badRequest(`${label} can have at most ${DECIMALS[currency]} decimals`);
-  if (Number(value) < MIN[currency]) throw badRequest(`${label} must be at least ${currency === "USD" ? "$1.00" : "0.001 ZEC"}`);
-}
 
 /** The amount a payer may pay through this link, or a 400 explaining why not. */
 function validateAmount(link: PaymentLink, amount: string) {
@@ -92,33 +84,7 @@ export async function linkRoutes(app: FastifyInstance) {
   app.post("/links", async (req, reply) => {
     const creator = creatorOf(req);
     const body = parseBody(createLinkSchema, req);
-    if (body.amountType === "FIXED") checkPrecision(body.amount!, body.currency, "Price");
-    if (body.minAmount) checkPrecision(body.minAmount, body.currency, "Minimum");
-    if (body.maxAmount) checkPrecision(body.maxAmount, body.currency, "Maximum");
-    for (const p of body.presets) checkPrecision(p, body.currency, "Suggested amount");
-    if (body.fields.length > 0 && !creator.boxPublicKey) {
-      throw badRequest("Set up encrypted responses before collecting fields. Sign in again with your recovery phrase on this device.");
-    }
-    if ((await prisma.shieldedAddress.count({ where: { creatorId: creator.id } })) === 0) {
-      throw badRequest("Add a shielded Zcash address before creating payment links.");
-    }
-
-    const fixed = body.amountType === "FIXED";
-    const link = await prisma.paymentLink.create({
-      data: {
-        id: publicId(),
-        creatorId: creator.id,
-        title: body.title,
-        description: body.description || null,
-        currency: body.currency,
-        amountType: body.amountType,
-        amount: fixed ? body.amount : null,
-        minAmount: fixed ? null : (body.minAmount ?? null),
-        maxAmount: fixed ? null : (body.maxAmount ?? null),
-        presets: fixed ? [] : body.presets,
-        fields: body.fields,
-      },
-    });
+    const link = await createPaymentLink(creator, body);
     reply.status(201);
     return toLinkDTO(link, { started: 0, paid: 0, receivedZec: "0", receivedUsd: "0.00" });
   });
@@ -214,12 +180,14 @@ export async function publicLinkRoutes(app: FastifyInstance) {
       const withCreator = { ...invoice, creator: link.creator };
 
       if (body.method === "zec") {
+        void emitCheckoutEvent(invoice.id, "checkout.created");
         reply.status(201);
         return { invoice: await toPublicInvoiceDTO(withCreator), swap: null };
       }
 
       try {
         const swap = await quoteInvoicePayment(invoice, { originAsset: body.originAsset!, refundTo: body.refundTo, dry: false });
+        void emitCheckoutEvent(invoice.id, "checkout.created");
         reply.status(201);
         return { invoice: await toPublicInvoiceDTO(withCreator), swap: swap as LinkCheckoutDTO["swap"] };
       } catch (err) {

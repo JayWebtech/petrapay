@@ -32,6 +32,7 @@ function PaymentPill({ status }: { status: InvoiceDTO["status"] }) {
   if (status === "PAID") return <Pill tone="success">Paid</Pill>;
   if (status === "PROCESSING") return <Pill tone="progress">Processing</Pill>;
   if (status === "CANCELLED") return <Pill tone="neutral">Cancelled</Pill>;
+  if (status === "EXPIRED") return <Pill tone="neutral">Expired</Pill>;
   return <Pill tone="info">Not paid yet</Pill>;
 }
 
