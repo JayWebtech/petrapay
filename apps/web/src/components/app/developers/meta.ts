@@ -11,16 +11,12 @@ export const EVENT_INFO: Record<WebhookEventType, string> = {
 
 export { WEBHOOK_EVENT_TYPES };
 
-const noop = () => () => {};
+const noop = () => () => { };
 
 /** This deployment's public API base, e.g. https://pay.example.com/api/v1. */
 export function useApiBase(): string {
-  const origin = useSyncExternalStore(
-    noop,
-    () => window.location.origin,
-    () => "https://your-petrapay-domain",
-  );
-  return `${origin}/api/v1`;
+
+  return `https://petrapay-production.up.railway.app/api/v1`;
 }
 
 export function summarizeEvents(events: string[]): string {
