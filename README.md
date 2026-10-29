@@ -1,6 +1,6 @@
 # PetraPay
-
-Privacy-first, cross-chain invoicing for creators. A freelancer sends a payment link; the client pays with whatever they hold (USDC on Base, SOL, ETH, BTC, USDT on Tron and 100+ other assets); [NEAR Intents](https://docs.near-intents.org) swaps it and settles **shielded ZEC** straight to the creator's Zcash wallet. Creators can later swap ZEC back out to any supported chain.
+Video Demo: https://vimeo.com/1240765085?share=copy&fl=sv&fe=ci
+Privacy-first, cross-chain invoicing for creators. A freelancer sends a payment link; the client pays with whatever they hold (USDC on Base, SOL, ETH, BTC, USDT on Tron and 100+ other assets); 
 
 The platform is non-custodial: it never holds keys or funds. It coordinates quotes and tracks their status.
 
