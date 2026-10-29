@@ -10,6 +10,12 @@ Client wallet ──(USDC on Base)──▶ 1Click deposit address ──▶ NEA
                                   (signed quote, refundable)                          in the creator's Zashi wallet
 ```
 
+## Demo
+
+[![Watch the PetraPay demo](https://vumbnail.com/1240767672.jpg)](https://vimeo.com/1240767672)
+
+▶️ **[Watch the full demo on Vimeo →](https://vimeo.com/1240767672)**
+
 ## Features
 
 **Creators**

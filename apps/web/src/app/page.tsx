@@ -6,6 +6,7 @@ import { ClosingCta, LandingFooter } from "@/components/app/landing/closing";
 import { Faq } from "@/components/app/landing/faq";
 import { Flow } from "@/components/app/landing/flow";
 import { Hero } from "@/components/app/landing/hero";
+import { VideoDemo } from "@/components/app/landing/video-demo";
 import { LandingNav } from "@/components/app/landing/landing-nav";
 import { PrivacyViews } from "@/components/app/landing/privacy-views";
 import { Accent, Reveal, SectionHeading } from "@/components/app/landing/reveal";
@@ -54,6 +55,7 @@ export default async function LandingPage() {
       <LandingNav />
       <main className="flex-1">
         <Hero />
+        <VideoDemo />
         <TokenMarquee tokens={marquee} tokenCount={tokenCount} chainCount={chainCount} />
         <Flow />
 
