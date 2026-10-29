@@ -1,5 +1,5 @@
 # PetraPay
-Video Demo: https://vimeo.com/1240765085?share=copy&fl=sv&fe=ci
+Video Demo: [https://vimeo.com/1240765085?share=copy&fl=sv&fe=ci](https://vimeo.com/1240767672?share=copy&fl=sv&fe=ci)
 
 Privacy-first, cross-chain invoicing for creators. A freelancer sends a payment link; the client pays with whatever they hold (USDC on Base, SOL, ETH, BTC, USDT on Tron and 100+ other assets); 
 
