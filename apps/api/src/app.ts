@@ -7,6 +7,7 @@ import { HttpError } from "./lib/http.ts";
 import { addressRoutes } from "./routes/addresses.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { developerRoutes } from "./routes/developers.ts";
+import { posDashboardRoutes, terminalRoutes } from "./routes/pos.ts";
 import { invoiceRoutes } from "./routes/invoices.ts";
 import { linkRoutes, publicLinkRoutes } from "./routes/links.ts";
 import { publicRoutes } from "./routes/public.ts";
@@ -53,6 +54,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   await app.register(linkRoutes);
   await app.register(withdrawalRoutes);
   await app.register(developerRoutes);
+  await app.register(posDashboardRoutes);
+  // Point-of-sale terminals (device-token auth).
+  await app.register(terminalRoutes);
   // Public merchant API (secret-key auth, Stripe-style errors).
   await app.register(v1Routes, { prefix: "/v1" });
 

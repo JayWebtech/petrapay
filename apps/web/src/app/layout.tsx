@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: { default: "PetraPay: get paid in any token, keep it shielded", template: "%s · PetraPay" },
   description:
-    "Privacy-first invoicing for creators. Clients pay with USDC, SOL, ETH and 100+ tokens; you settle in shielded ZEC.",
+    "Privacy-first payments for businesses, online stores and creators. Customers pay with USDC, SOL, ETH and 190+ tokens; you settle in shielded ZEC.",
   referrer: "no-referrer",
 };
 

@@ -683,3 +683,78 @@ describe("merchant API", () => {
     });
   });
 });
+
+describe("point of sale terminals", () => {
+  /** A merchant with addresses and a terminal paired through the dashboard code. */
+  async function pairedTerminal() {
+    const m = await signIn();
+    await m.call("POST", "/addresses", { addresses: ORCHARD.slice(0, 3) });
+    const { code } = (await m.call("POST", "/pos-devices/pairing-code")).json();
+    assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    const paired = await app.inject({ method: "POST", url: "/terminal/pair", payload: { code: code.toLowerCase(), deviceName: "Senraise H10" } });
+    assert.equal(paired.statusCode, 201, paired.body);
+    const { token } = paired.json();
+    const t = (method: "GET" | "POST", url: string, payload?: unknown, headers: Record<string, string> = {}) =>
+      app.inject({ method, url, payload: payload as object, headers: { authorization: `Bearer ${token}`, ...headers } });
+    return { ...m, code, token, t };
+  }
+
+  test("a pairing code works once and only before it expires", async () => {
+    const { code } = await pairedTerminal();
+    const again = await app.inject({ method: "POST", url: "/terminal/pair", payload: { code, deviceName: "Second" } });
+    assert.equal(again.statusCode, 400);
+
+    const m = await signIn();
+    const fresh = (await m.call("POST", "/pos-devices/pairing-code")).json();
+    await prisma.posPairingCode.updateMany({ where: { usedAt: null }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    assert.equal((await app.inject({ method: "POST", url: "/terminal/pair", payload: { code: fresh.code, deviceName: "Late" } })).statusCode, 400);
+  });
+
+  test("the terminal rings up sales with a QR for the hosted checkout", async () => {
+    const { t } = await pairedTerminal();
+    const me = (await t("GET", "/terminal/me")).json();
+    assert.equal(me.canAcceptPayments, true);
+    assert.equal(me.deviceName, "Senraise H10");
+
+    const res = await t("POST", "/terminal/sales", { amount: "12.50", currency: "USD" }, { "idempotency-key": "sale-1" });
+    assert.equal(res.statusCode, 201, res.body);
+    const sale = res.json();
+    assert.equal(sale.status, "OPEN");
+    assert.equal(sale.amount, "12.5");
+    assert.match(sale.checkoutUrl, new RegExp(`/pay/${sale.id}$`));
+    assert.match(sale.qrDataUrl, /^data:image\/png;base64,/);
+    const minutes = (new Date(sale.expiresAt).getTime() - Date.now()) / 60_000;
+    assert.ok(minutes > 14 && minutes <= 15);
+
+    const retried = (await t("POST", "/terminal/sales", { amount: "12.50", currency: "USD" }, { "idempotency-key": "sale-1" })).json();
+    assert.equal(retried.id, sale.id, "a retried charge doesn't create a second sale");
+
+    const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: sale.id } });
+    assert.equal(invoice.source, "POS");
+
+    assert.equal((await t("GET", "/terminal/sales")).json().length, 1);
+    assert.equal((await t("GET", `/terminal/sales/${sale.id}`)).json().qrDataUrl, null);
+    assert.equal((await t("POST", `/terminal/sales/${sale.id}/cancel`)).json().status, "CANCELLED");
+  });
+
+  test("a terminal token can't reach the rest of the account", async () => {
+    const { t, token } = await pairedTerminal();
+    for (const url of ["/invoices", "/me", "/withdrawals", "/api-keys"]) {
+      assert.equal((await app.inject({ method: "GET", url, headers: { authorization: `Bearer ${token}` } })).statusCode, 401, url);
+    }
+    assert.equal((await app.inject({ method: "GET", url: "/v1/checkouts", headers: { authorization: `Bearer ${token}` } })).statusCode, 401);
+    assert.equal((await t("POST", "/terminal/sales", { amount: "0.5", currency: "USD" })).statusCode, 400);
+  });
+
+  test("terminals only see their own sales, and removed terminals stop working", async () => {
+    const a = await pairedTerminal();
+    const sale = (await a.t("POST", "/terminal/sales", { amount: "5", currency: "USD" })).json();
+    const b = await pairedTerminal();
+    assert.equal((await b.t("GET", `/terminal/sales/${sale.id}`)).statusCode, 404);
+
+    const [device] = (await a.call("GET", "/pos-devices")).json();
+    assert.equal(device.sales, 1);
+    await a.call("DELETE", `/pos-devices/${device.id}`);
+    assert.equal((await a.t("GET", "/terminal/me")).statusCode, 401);
+  });
+});

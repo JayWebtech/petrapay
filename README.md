@@ -35,6 +35,9 @@ Client wallet ──(USDC on Base)──▶ 1Click deposit address ──▶ NEA
 - **Signed webhooks** (`checkout.created`, `.processing`, `.paid`, `.cancelled`, `.expired`) with an HMAC-SHA256 `PetraPay-Signature` header, retries with backoff for about two days, a delivery log with payloads, resend, and test events. Webhook URLs must be public https addresses (private/loopback targets are blocked unless `WEBHOOK_ALLOW_PRIVATE=true`).
 - Full reference with code samples at `/docs`.
 
+**Point of sale (Android)**
+- `apps/pos`: a React Native app for Android payment terminals (e.g. Senraise H10 with a built-in printer). Pair it with a one-time code from Dashboard → Point of sale; the cashier types an amount, the customer scans and pays with any token or shielded ZEC, and the terminal prints the receipt. Terminal tokens can only ring up and view that terminal's sales. See [apps/pos/README.md](apps/pos/README.md).
+
 **Payers**
 - Pick any token from 100+ assets. See a live quote (amount, USD value, ETA) before committing.
 - One-click **Pay with wallet** for EVM chains (MetaMask, Rabby…) and Solana (Phantom, Solflare, Backpack), or scan an EIP-681 / Solana Pay / BIP-21 QR, or copy the address.

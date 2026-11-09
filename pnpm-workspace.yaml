@@ -1,6 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # The React Native POS app is installed separately with npm (see apps/pos).
+  - "!apps/pos"
 
 onlyBuiltDependencies:
   - "@prisma/engines"

@@ -95,7 +95,9 @@ export function InvoiceTable({ invoices, compact = false }: { invoices: InvoiceD
                 <p className="truncate font-medium">{inv.title}</p>
                 <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
                   #{String(inv.number).padStart(3, "0")}
-                  {inv.source === "API" ? <span className="rounded bg-[#eeecfd] px-1 font-sans text-[10px] font-semibold text-primary">API</span> : null}
+                  {inv.source === "API" || inv.source === "POS" ? (
+                    <span className="rounded bg-[#eeecfd] px-1 font-sans text-[10px] font-semibold text-primary">{inv.source}</span>
+                  ) : null}
                   {inv.reference ? <span className="truncate">{inv.reference}</span> : null}
                 </p>
               </td>

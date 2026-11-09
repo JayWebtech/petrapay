@@ -34,6 +34,8 @@ model Creator {
   webhookEndpoints WebhookEndpoint[]
   webhookEvents    WebhookEvent[]
   idempotencyKeys  IdempotencyKey[]
+  posDevices       PosDevice[]
+  posPairingCodes  PosPairingCode[]
 }
 
 model AuthChallenge {
@@ -88,6 +90,7 @@ enum InvoiceSource {
   DASHBOARD
   API
   LINK
+  POS
 }
 
 enum Currency {
@@ -137,6 +140,9 @@ model Invoice {
   cancelUrl         String?
   /// After this, no new quotes are issued and the checkout becomes EXPIRED.
   expiresAt         DateTime?
+  /// The point-of-sale terminal that rang up this sale.
+  posDeviceId       String?
+  posDevice         PosDevice?      @relation(fields: [posDeviceId], references: [id], onDelete: SetNull)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -147,6 +153,7 @@ model Invoice {
   @@index([linkId])
   @@index([creatorId, reference])
   @@index([status, expiresAt])
+  @@index([posDeviceId, createdAt])
 }
 
 enum LinkAmountType {
@@ -336,4 +343,34 @@ model IdempotencyKey {
   createdAt   DateTime @default(now())
 
   @@id([creatorId, key])
+}
+
+/// A paired point-of-sale terminal. Its token can only ring up and view POS sales.
+model PosDevice {
+  id         String    @id @default(cuid())
+  creatorId  String
+  creator    Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  name       String
+  /// SHA-256 of the device token.
+  tokenHash  String    @unique
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  sales Invoice[]
+
+  @@index([creatorId])
+}
+
+/// Short-lived, single-use code a merchant shows in the dashboard to pair a terminal.
+model PosPairingCode {
+  /// SHA-256 of the code.
+  codeHash  String    @id
+  creatorId String
+  creator   Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([creatorId])
 }

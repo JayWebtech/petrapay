@@ -15,6 +15,7 @@ import {
   Search,
   Settings,
   Shield,
+  Store,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const NAV: NavItem[] = [
   { href: "/dashboard/links", label: "Payment links", icon: Link2 },
   { href: "/dashboard/withdrawals", label: "Withdrawals", icon: ArrowUpRight, alsoMatches: ["/dashboard/withdraw"] },
   { href: "/dashboard/addresses", label: "Shielded addresses", icon: Shield },
+  { href: "/dashboard/pos", label: "Point of sale", icon: Store },
   { href: "/dashboard/developers", label: "Developers", icon: CodeXml },
 ];
 

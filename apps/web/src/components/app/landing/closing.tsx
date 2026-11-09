@@ -30,7 +30,7 @@ export function ClosingCta() {
               accentClassName="bg-[#f5deb0]"
               labelClassName="text-base"
             >
-              Send your first invoice
+              Start accepting payments
             </ExpandingArrowButton>
           </div>
         </Reveal>
@@ -48,7 +48,7 @@ export function LandingFooter() {
             <LogoMark className="size-7" /> PetraPay
           </Link>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-            Privacy-first invoicing for creators. Cross-chain swaps, privacy by Zcash. Non-custodial by design.
+            Privacy-first payments for businesses and creators. Cross-chain swaps, privacy by Zcash. Non-custodial by design.
           </p>
         </div>
         <div className="text-sm">

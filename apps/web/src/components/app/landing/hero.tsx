@@ -100,8 +100,8 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.75, ease: EASE }}
             className="mt-7 max-w-xl text-base leading-relaxed text-pretty text-white/75 md:text-lg"
           >
-            Stripe-simple invoicing for creators who work in public but bank in private. Clients pay with whatever they hold, on any chain.
-            You receive shielded Zcash.
+            Checkout, payment links, in-store POS and a developer API for businesses, online stores and creators. Customers pay with
+            whatever they hold, on any chain. You receive shielded Zcash.
           </motion.p>
 
           <motion.div
@@ -116,7 +116,7 @@ export function Hero() {
               accentClassName="bg-[#f5deb0]"
               labelClassName="text-base"
             >
-              Start invoicing free
+              Start accepting payments
             </ExpandingArrowButton>
             <a
               href="#flow"

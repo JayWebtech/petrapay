@@ -106,7 +106,8 @@ export async function createInvoice(
     dueDate?: Date | null;
     linkId?: string;
     responses?: string | null;
-    source?: "DASHBOARD" | "API" | "LINK";
+    source?: "DASHBOARD" | "API" | "LINK" | "POS";
+    posDeviceId?: string;
     reference?: string | null;
     metadata?: Record<string, string> | null;
     successUrl?: string | null;
@@ -145,6 +146,7 @@ export async function createInvoice(
         successUrl: data.successUrl ?? null,
         cancelUrl: data.cancelUrl ?? null,
         expiresAt: data.expiresAt ?? null,
+        posDeviceId: data.posDeviceId,
       },
       include: INVOICE_INCLUDE,
     });

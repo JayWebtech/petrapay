@@ -206,7 +206,7 @@ export type QuotePreviewDTO = {
 };
 
 export type InvoiceStatus = "OPEN" | "PROCESSING" | "PAID" | "CANCELLED" | "EXPIRED";
-export type InvoiceSource = "DASHBOARD" | "API" | "LINK";
+export type InvoiceSource = "DASHBOARD" | "API" | "LINK" | "POS";
 
 export type LineItem = z.infer<typeof lineItemSchema>;
 
