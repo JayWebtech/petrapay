@@ -1,7 +1,7 @@
 "use client";
 
 import { formatAmount, formatUsd, type InvoiceDTO, type LinkFieldType, type PaymentLinkDTO, type PaymentLinkDetailDTO } from "@petrapay/shared";
-import { ArrowLeft, ChevronRight, ExternalLink, Link2, Lock, Pause, Play } from "lucide-react";
+import { ArrowLeft, ChevronRight, ExternalLink, Link2, Lock, Pause, Pencil, Play } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -66,7 +66,8 @@ export default function LinkDetailPage() {
   }
 
   const url = linkUrl(link.id);
-  const hasFields = link.fields.length > 0;
+  // Keep showing answers from earlier payments even if the link's fields were later removed.
+  const hasFields = link.fields.length > 0 || link.payments.some((p) => p.responses);
   const conversion = link.stats.started ? Math.round((link.stats.paid / link.stats.started) * 100) : null;
 
   const toggle = async () => {
@@ -115,6 +116,9 @@ export default function LinkDetailPage() {
           />
           <Link href={`/l/${link.id}`} target="_blank" className="btn-soft h-9 rounded-xl px-3 text-sm font-medium">
             Open <ExternalLink className="size-3.5" />
+          </Link>
+          <Link href={`/dashboard/links/${link.id}/edit`} className="btn-soft h-9 rounded-xl px-3 text-sm font-medium">
+            <Pencil className="size-3.5" /> Edit
           </Link>
           <button
             type="button"

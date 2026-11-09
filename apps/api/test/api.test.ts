@@ -266,7 +266,14 @@ describe("payment links", () => {
     return { ...creator, link: res.json() };
   }
 
-  const checkout = (id: string, payload: Record<string, unknown>) => app.inject({ method: "POST", url: `/public/links/${id}/checkout`, payload });
+  // Each checkout comes from its own address so the per-IP rate limit doesn't trip across tests.
+  const checkout = (id: string, payload: Record<string, unknown>) =>
+    app.inject({
+      method: "POST",
+      url: `/public/links/${id}/checkout`,
+      payload,
+      headers: { "x-forwarded-for": `203.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}` },
+    });
 
   test("collecting fields needs an encryption key on file", async () => {
     const { call } = await signIn();
@@ -334,6 +341,44 @@ describe("payment links", () => {
     const other = await signIn();
     assert.equal((await other.call("GET", `/links/${link.id}`)).statusCode, 404);
     assert.equal((await other.call("PATCH", `/links/${link.id}`, { active: false })).statusCode, 404);
+    const edit = { title: "Mine now", currency: "USD", amountType: "FIXED", amount: "5" };
+    assert.equal((await other.call("PUT", `/links/${link.id}`, edit)).statusCode, 404);
+  });
+
+  test("editing a link adds fields and changes pricing for new payments only", async () => {
+    const { call, link } = await creatorWithLink({ amountType: "FIXED", amount: "0.5" });
+    const first = await checkout(link.id, { amount: "0.5", method: "zec" });
+    assert.equal(first.statusCode, 201, first.body);
+
+    const edited = await call("PUT", `/links/${link.id}`, {
+      title: "Sticker pack v2",
+      currency: "ZEC",
+      amountType: "CUSTOM",
+      minAmount: "0.1",
+      presets: ["0.2"],
+      fields,
+    });
+    assert.equal(edited.statusCode, 200, edited.body);
+    const updated = edited.json();
+    assert.equal(updated.id, link.id, "the link keeps its id and URL");
+    assert.equal(updated.title, "Sticker pack v2");
+    assert.equal(updated.amountType, "CUSTOM");
+    assert.equal(updated.amount, null);
+    assert.equal(updated.fields.length, 2);
+
+    // Payers now see the new fields and must answer them; the old fixed price no longer applies.
+    const pub = (await app.inject({ method: "GET", url: `/public/links/${link.id}` })).json();
+    assert.deepEqual(pub.fields.map((f: { id: string }) => f.id), ["email", "size"]);
+    assert.equal((await checkout(link.id, { amount: "0.3", method: "zec" })).statusCode, 400);
+    assert.equal((await checkout(link.id, { amount: "0.3", method: "zec", responses: "box1:sealed" })).statusCode, 201);
+
+    // The earlier payment keeps its own amount.
+    const detail = (await call("GET", `/links/${link.id}`)).json();
+    assert.deepEqual(detail.payments.map((p: { amount: string }) => p.amount).sort(), ["0.3", "0.5"]);
+
+    // Edits are validated like new links.
+    const bad = await call("PUT", `/links/${link.id}`, { title: "Tee", currency: "USD", amountType: "FIXED", amount: "0.50" });
+    assert.equal(bad.statusCode, 400);
   });
 });
 

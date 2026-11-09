@@ -16,7 +16,7 @@ import { prisma, type PaymentLink } from "../db.ts";
 import { HttpError, badRequest, notFound, parseBody } from "../lib/http.ts";
 import { creatorOf, requireCreator } from "../services/auth.ts";
 import { INVOICE_INCLUDE, createInvoice, discardInvoice, toInvoiceDTO, toPublicInvoiceDTO } from "../services/invoices.ts";
-import { checkPrecision, createPaymentLink } from "../services/links.ts";
+import { checkPrecision, createPaymentLink, updatePaymentLink } from "../services/links.ts";
 import { getToken } from "../services/oneclick.ts";
 import { emitCheckoutEvent } from "../services/webhooks.ts";
 import { previewPayment, quoteInvoicePayment } from "../services/payments.ts";
@@ -97,6 +97,15 @@ export async function linkRoutes(app: FastifyInstance) {
     if (!link) throw notFound("Payment link not found");
     const stats = await statsFor([link.id]);
     return { ...toLinkDTO(link, stats.get(link.id)!), payments: await Promise.all(link.invoices.map(toInvoiceDTO)) };
+  });
+
+  /** Edit a link's title, pricing and form fields. */
+  app.put<{ Params: { id: string } }>("/links/:id", async (req) => {
+    const body = parseBody(createLinkSchema, req);
+    const link = await updatePaymentLink(creatorOf(req), req.params.id, body);
+    if (!link) throw notFound("Payment link not found");
+    const stats = await statsFor([link.id]);
+    return toLinkDTO(link, stats.get(link.id)!);
   });
 
   app.patch<{ Params: { id: string } }>("/links/:id", async (req) => {

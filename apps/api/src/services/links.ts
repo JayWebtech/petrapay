@@ -12,8 +12,8 @@ export function checkPrecision(value: string, currency: "USD" | "ZEC", label: st
   if (Number(value) < MIN[currency]) throw badRequest(`${label} must be at least ${currency === "USD" ? "$1.00" : "0.001 ZEC"}`);
 }
 
-/** Validates and creates a payment link. Used by the dashboard and the public API. */
-export async function createPaymentLink(creator: Creator, body: CreateLinkInput) {
+/** Checks amounts and fields, and returns the columns to store. Shared by create and edit. */
+function linkData(creator: Creator, body: CreateLinkInput) {
   if (body.amountType === "FIXED") checkPrecision(body.amount!, body.currency, "Price");
   if (body.minAmount) checkPrecision(body.minAmount, body.currency, "Minimum");
   if (body.maxAmount) checkPrecision(body.maxAmount, body.currency, "Maximum");
@@ -21,24 +21,35 @@ export async function createPaymentLink(creator: Creator, body: CreateLinkInput)
   if (body.fields.length > 0 && !creator.boxPublicKey) {
     throw badRequest("Set up encrypted responses before collecting fields. Sign in again with your recovery phrase on this device.");
   }
+  const fixed = body.amountType === "FIXED";
+  return {
+    title: body.title,
+    description: body.description || null,
+    currency: body.currency,
+    amountType: body.amountType,
+    amount: fixed ? body.amount! : null,
+    minAmount: fixed ? null : (body.minAmount ?? null),
+    maxAmount: fixed ? null : (body.maxAmount ?? null),
+    presets: fixed ? [] : body.presets,
+    fields: body.fields,
+  };
+}
+
+/** Validates and creates a payment link. Used by the dashboard and the public API. */
+export async function createPaymentLink(creator: Creator, body: CreateLinkInput) {
+  const data = linkData(creator, body);
   if ((await prisma.shieldedAddress.count({ where: { creatorId: creator.id } })) === 0) {
     throw badRequest("Add a shielded Zcash address before creating payment links.");
   }
+  return prisma.paymentLink.create({ data: { id: publicId(), creatorId: creator.id, ...data } });
+}
 
-  const fixed = body.amountType === "FIXED";
-  return prisma.paymentLink.create({
-    data: {
-      id: publicId(),
-      creatorId: creator.id,
-      title: body.title,
-      description: body.description || null,
-      currency: body.currency,
-      amountType: body.amountType,
-      amount: fixed ? body.amount : null,
-      minAmount: fixed ? null : (body.minAmount ?? null),
-      maxAmount: fixed ? null : (body.maxAmount ?? null),
-      presets: fixed ? [] : body.presets,
-      fields: body.fields,
-    },
-  });
+/**
+ * Replaces a link's details. The id (and so the URL) stays the same. Checkouts already created
+ * through the link keep their own amount and answers; only new payments use the changes.
+ */
+export async function updatePaymentLink(creator: Creator, id: string, body: CreateLinkInput) {
+  const found = await prisma.paymentLink.findFirst({ where: { id, creatorId: creator.id }, select: { id: true } });
+  if (!found) return null;
+  return prisma.paymentLink.update({ where: { id: found.id }, data: linkData(creator, body) });
 }

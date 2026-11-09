@@ -71,6 +71,10 @@ export function PaymentLinks() {
       <List>
         <li>Each link has a page with its QR, payment history, amount received and conversion.</li>
         <li>
+          <strong>Edit</strong> a link&apos;s title, pricing or form fields at any time. The link stays the same; changes apply to new payments, and
+          past payments keep their amount and answers.
+        </li>
+        <li>
           <strong>Pause</strong> a link to stop new payments; customers see that it&apos;s paused.
         </li>
         <li>
