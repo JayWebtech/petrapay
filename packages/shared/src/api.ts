@@ -224,6 +224,8 @@ export type InvoiceDTO = {
   clientEmail: string | null;
   editedAt: string | null;
   source: InvoiceSource;
+  /** A test sale from a POS terminal in test mode. */
+  testMode: boolean;
   /** Merchant order id and key/value pairs, set through the API. */
   reference: string | null;
   metadata: Record<string, string> | null;
@@ -259,6 +261,8 @@ export type PublicInvoiceDTO = {
   creatorName: string;
   /** Set when a payer started this payment from a payment link. */
   linkId: string | null;
+  /** A test sale: the page offers "Simulate payment" instead of requiring real funds. */
+  testMode: boolean;
   /** Checkout redirects set by the merchant through the API. */
   successUrl: string | null;
   cancelUrl: string | null;

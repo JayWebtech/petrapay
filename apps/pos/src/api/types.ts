@@ -8,6 +8,8 @@ export interface Me {
   deviceName: string;
   canAcceptPayments: boolean;
   freshAddresses: number;
+  /** Test terminal: its sales can be paid with a simulated payment on the checkout page. */
+  testMode: boolean;
 }
 
 /** A sale rung up on this terminal (see apps/api/src/routes/pos.ts). */
@@ -18,6 +20,7 @@ export interface Sale {
   amount: string;
   currency: Currency;
   note: string;
+  testMode: boolean;
   /** The hosted checkout the customer opens by scanning; doubles as their receipt link. */
   checkoutUrl: string;
   /** PNG data URL of checkoutUrl, sent when the sale is created or asked for with ?qr=1. */

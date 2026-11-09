@@ -49,6 +49,7 @@ export function HomeScreen() {
           <Row style={{ gap: space.md, marginBottom: space.lg }}>
             <PetraMark size={30} />
             <T v="heading" numberOfLines={1} style={{ flex: 1 }}>{me.merchantName}</T>
+            {me.testMode ? <Badge label="TEST MODE" tone="warning" /> : null}
             <IconButton name="settings" label="Settings" onPress={() => nav.push({ name: 'settings' })} />
           </Row>
         </FadeIn>

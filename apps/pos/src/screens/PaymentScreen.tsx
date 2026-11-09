@@ -234,6 +234,14 @@ function QrBlock({ sale, qr }: { sale: Sale; qr: string | null }) {
         <T v="label">Any token, or shielded ZEC</T>
       </FadeIn>
 
+      {sale.testMode ? (
+        <FadeIn delay={230} style={{ alignSelf: 'stretch', marginTop: space.md }}>
+          <Banner tone="warning" title="Test sale">
+            Scan the code and tap “Simulate payment” on the checkout page. No real money moves.
+          </Banner>
+        </FadeIn>
+      ) : null}
+
       {sale.customerReportedZec ? (
         <FadeIn delay={240} style={{ alignSelf: 'stretch', marginTop: space.md }}>
           <Banner tone="warning" title="Customer says they paid in ZEC">

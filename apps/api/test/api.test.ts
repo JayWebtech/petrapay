@@ -746,6 +746,34 @@ describe("point of sale terminals", () => {
     assert.equal((await t("POST", "/terminal/sales", { amount: "0.5", currency: "USD" })).statusCode, 400);
   });
 
+  test("only sales from a test terminal can be paid with a simulated payment", async () => {
+    const m = await pairedTerminal();
+    const live = (await m.t("POST", "/terminal/sales", { amount: "5", currency: "USD" })).json();
+    assert.equal(live.testMode, false);
+    const refused = await app.inject({ method: "POST", url: `/public/invoices/${live.id}/simulate` });
+    assert.equal(refused.statusCode, 403, "a real sale can't be simulated");
+
+    const [device] = (await m.call("GET", "/pos-devices")).json();
+    const toggled = await app.inject({ method: "PATCH", url: `/pos-devices/${device.id}`, payload: { testMode: true }, cookies: { pp_session: "" } });
+    assert.equal(toggled.statusCode, 401, "only the merchant can switch test mode");
+    assert.equal((await m.call("PATCH", `/pos-devices/${device.id}`, { testMode: true })).json().testMode, true);
+    assert.equal((await m.t("GET", "/terminal/me")).json().testMode, true);
+
+    const test = (await m.t("POST", "/terminal/sales", { amount: "5", currency: "USD" })).json();
+    assert.equal(test.testMode, true);
+    const pub = (await app.inject({ method: "GET", url: `/public/invoices/${test.id}` })).json();
+    assert.equal(pub.testMode, true);
+    const paid = await app.inject({ method: "POST", url: `/public/invoices/${test.id}/simulate` });
+    assert.equal(paid.statusCode, 200, paid.body);
+    assert.equal(paid.json().status, "PAID");
+    assert.equal((await m.t("GET", `/terminal/sales/${test.id}`)).json().status, "PAID");
+    assert.equal((await app.inject({ method: "POST", url: `/public/invoices/${test.id}/simulate` })).statusCode, 409, "only once");
+
+    // Test money never shows up in the merchant's totals.
+    const stats = (await m.call("GET", "/stats")).json();
+    assert.equal(stats.paidCount, 0);
+  });
+
   test("terminals only see their own sales, and removed terminals stop working", async () => {
     const a = await pairedTerminal();
     const sale = (await a.t("POST", "/terminal/sales", { amount: "5", currency: "USD" })).json();

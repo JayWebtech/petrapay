@@ -2,7 +2,8 @@ import { depositTxSchema, payQuoteSchema } from "@petrapay/shared";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.ts";
 import { HttpError, notFound, parseBody } from "../lib/http.ts";
-import { toPublicInvoiceDTO } from "../services/invoices.ts";
+import { invoiceZats, isPastExpiry, toPublicInvoiceDTO } from "../services/invoices.ts";
+import { emitCheckoutEvent } from "../services/webhooks.ts";
 import { confidentiality, getTokens, submitDepositTx } from "../services/oneclick.ts";
 import { quoteInvoicePayment } from "../services/payments.ts";
 import { isTerminal, refreshSwap, toSwapDTO } from "../services/swaps.ts";
@@ -36,6 +37,38 @@ export async function publicRoutes(app: FastifyInstance) {
       const body = parseBody(payQuoteSchema, req);
       const invoice = await loadPayableInvoice(req.params.id);
       return quoteInvoicePayment(invoice, body);
+    },
+  );
+
+  /**
+   * Test sales only (from a POS terminal in test mode): settle as if the customer paid, without funds.
+   * The flag lives on the sale, set by the server when the test terminal rang it up, so a real sale
+   * can never be "paid" this way however the request is made.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/public/invoices/:id/simulate",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (req) => {
+      const invoice = await loadPayableInvoice(req.params.id);
+      if (!invoice.testMode) throw new HttpError(403, "Only test sales can be paid with a simulated payment.");
+      if (invoice.status !== "OPEN") throw new HttpError(409, "This sale isn't waiting for payment.");
+      if (isPastExpiry(invoice)) throw new HttpError(409, "This checkout has expired.");
+      let receivedZats: bigint | null = null;
+      let receivedUsd: string | null = invoice.currency === "USD" ? invoice.amount.toString() : null;
+      try {
+        const { zats, zecPriceUsd } = await invoiceZats(invoice);
+        receivedZats = zats;
+        if (!receivedUsd && zecPriceUsd) receivedUsd = ((Number(zats) / 1e8) * zecPriceUsd).toFixed(2);
+      } catch {
+        // No price feed: still mark it paid, without a ZEC figure.
+      }
+      const updated = await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { status: "PAID", paidAt: new Date(), receivedZats, receivedUsd },
+        include: { address: true, creator: true },
+      });
+      void emitCheckoutEvent(invoice.id, "checkout.paid");
+      return toPublicInvoiceDTO(updated);
     },
   );
 

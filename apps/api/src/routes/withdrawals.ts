@@ -90,12 +90,13 @@ export async function withdrawalRoutes(app: FastifyInstance) {
     const days = Math.min(365, Math.max(7, Number(req.query.days) || 30));
     const [paid, open, withdrawals, settledPayments, zec] = await Promise.all([
       prisma.invoice.findMany({
-        where: { creatorId, status: "PAID" },
+        // Simulated payments from test terminals aren't money.
+        where: { creatorId, status: "PAID", testMode: false },
         select: { receivedZats: true, receivedUsd: true, paidAt: true },
       }),
       prisma.invoice.findMany({
         // Link checkouts that were started but never paid are abandoned carts, not money owed.
-        where: { creatorId, status: { in: ["OPEN", "PROCESSING"] }, OR: [{ linkId: null }, { status: "PROCESSING" }] },
+        where: { creatorId, testMode: false, status: { in: ["OPEN", "PROCESSING"] }, OR: [{ linkId: null }, { status: "PROCESSING" }] },
         select: { status: true, currency: true, amount: true },
       }),
       prisma.swap.findMany({ where: { creatorId, kind: "WITHDRAWAL", status: "SUCCESS" }, select: { amountIn: true } }),

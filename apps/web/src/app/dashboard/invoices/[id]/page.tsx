@@ -131,6 +131,7 @@ export default function InvoiceDetailPage() {
               {amount} <span className="text-lg font-medium text-muted-foreground">{invoice.currency}</span>
             </h1>
             <InvoicePill status={invoice.status} dueDate={invoice.dueDate} />
+            {invoice.testMode ? <span className="rounded-md bg-[#fff1e6] px-1.5 py-0.5 text-xs font-semibold text-[#9a3f00]">Test sale</span> : null}
           </div>
           <p className="mt-2 truncate text-[15px] text-foreground/80">{invoice.title}</p>
         </div>

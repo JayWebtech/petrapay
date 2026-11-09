@@ -37,19 +37,22 @@ function header(me: Me, title: string): PrintOp[] {
 /** Receipt for a paid sale. The merchant copy adds what settled to the shielded wallet. */
 export function saleReceipt(sale: Sale, me: Me, copy: 'customer' | 'merchant' = 'customer'): PrintOp[] {
   const ops = header(me, copy === 'merchant' ? 'MERCHANT COPY' : 'PAYMENT RECEIPT');
+  if (sale.testMode) ops.push({ type: 'text', text: '*** TEST - NOT A REAL PAYMENT ***', align: 'center', bold: true });
 
   ops.push(row('Sale', saleRef(sale.number)), row('Date', fullTime(sale.paidAt ?? sale.createdAt)));
   if (sale.note && sale.note !== 'In-store payment') ops.push(row('Item', sale.note));
   ops.push({ type: 'divider', width: WIDTH });
 
   ops.push(row('TOTAL', amount(sale.amount, sale.currency), { bold: true, size: 28 }));
-  if (sale.paidWith) {
+  if (sale.testMode && !sale.paidWith) {
+    ops.push(row('Paid with', 'Simulated'));
+  } else if (sale.paidWith) {
     ops.push(row('Paid with', `${Number(sale.paidWith.amount).toLocaleString('en-US', { maximumFractionDigits: 6 })} ${sale.paidWith.symbol}`));
     ops.push(row('Network', chainName(sale.paidWith.chain)));
   } else {
     ops.push(row('Paid with', 'Shielded ZEC'));
   }
-  ops.push(row('Status', 'PAID', { bold: true }));
+  ops.push(row('Status', sale.testMode ? 'PAID (TEST)' : 'PAID', { bold: true }));
 
   if (copy === 'merchant' && sale.received) {
     ops.push({ type: 'divider', width: WIDTH }, row('Received', amount(sale.received.zec, 'ZEC'), { bold: true }));

@@ -20,6 +20,7 @@ export function toCheckoutObject(invoice: Invoice) {
   return {
     id: invoice.id,
     object: "checkout" as const,
+    livemode: !invoice.testMode,
     url: checkoutUrl(invoice.id),
     status,
     number: invoice.number,

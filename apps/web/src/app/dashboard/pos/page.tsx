@@ -7,10 +7,11 @@ import { PageHeader, Panel } from "@/components/app/dash/ui";
 import { formatDate } from "@/components/app/invoice-row";
 import { useToast } from "@/components/app/toaster";
 import { Loader } from "@/components/motion/loader";
+import { Switch } from "@/components/motion/switch";
 import { useApi } from "@/hooks/use-api";
 import { api, errorMessage } from "@/lib/api";
 
-type Terminal = { id: string; name: string; createdAt: string; lastSeenAt: string | null; sales: number };
+type Terminal = { id: string; name: string; testMode: boolean; createdAt: string; lastSeenAt: string | null; sales: number };
 
 const when = (iso: string | null) => (iso ? formatDate(iso, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Not yet");
 
@@ -36,6 +37,19 @@ export default function PointOfSalePage() {
       toast.error("Couldn't create a code", errorMessage(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const setTestMode = async (t: Terminal, testMode: boolean) => {
+    try {
+      await api(`/pos-devices/${t.id}`, { method: "PATCH", body: { testMode } });
+      toast.success(
+        testMode ? "Test mode on" : "Test mode off",
+        testMode ? `New sales on ${t.name} can be paid with a simulated payment.` : `${t.name} takes real payments only.`,
+      );
+      void reload();
+    } catch (err) {
+      toast.error("Couldn't change test mode", errorMessage(err));
     }
   };
 
@@ -75,7 +89,10 @@ export default function PointOfSalePage() {
             </ol>
           </Panel>
 
-          <Panel title="Paired terminals">
+          <Panel
+            title="Paired terminals"
+            action={<span className="hidden text-xs text-muted-foreground sm:block">Test mode lets you simulate payments, for trying the flow</span>}
+          >
             {error && !terminals ? (
               <p className="px-5 py-8 text-center text-sm text-destructive">{error}</p>
             ) : !terminals ? (
@@ -92,11 +109,15 @@ export default function PointOfSalePage() {
                       <Store className="size-4.5 text-muted-foreground" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{t.name}</p>
+                      <p className="flex items-center gap-2 truncate text-sm font-semibold">
+                        {t.name}
+                        {t.testMode ? <span className="rounded bg-[#fff1e6] px-1.5 py-0.5 text-[10px] font-semibold text-[#9a3f00]">TEST MODE</span> : null}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {t.sales} sale{t.sales === 1 ? "" : "s"} · last active {when(t.lastSeenAt)} · paired {formatDate(t.createdAt, { month: "short", day: "numeric" })}
                       </p>
                     </div>
+                    <Switch checked={t.testMode} onCheckedChange={(on) => void setTestMode(t, on)} label="Test mode" className="text-xs" />
                     {confirming === t.id ? (
                       <span className="flex gap-1">
                         <button type="button" onClick={() => remove(t)} className="h-8 rounded-lg bg-[#fdecec] px-2.5 text-xs font-semibold text-destructive">

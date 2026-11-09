@@ -10,8 +10,8 @@ import { LogoMark } from "../logo";
 
 const LINKS = [
   { href: "#flow", label: "How it works" },
-  { href: "#features", label: "Features" },
-  { href: "#privacy", label: "Privacy" },
+  { href: "#checkout", label: "Checkout" },
+  { href: "#pos", label: "Point of sale" },
   { href: "#faq", label: "FAQ" },
 ];
 

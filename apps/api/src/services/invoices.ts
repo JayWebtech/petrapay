@@ -108,6 +108,7 @@ export async function createInvoice(
     responses?: string | null;
     source?: "DASHBOARD" | "API" | "LINK" | "POS";
     posDeviceId?: string;
+    testMode?: boolean;
     reference?: string | null;
     metadata?: Record<string, string> | null;
     successUrl?: string | null;
@@ -147,6 +148,7 @@ export async function createInvoice(
         cancelUrl: data.cancelUrl ?? null,
         expiresAt: data.expiresAt ?? null,
         posDeviceId: data.posDeviceId,
+        testMode: data.testMode ?? false,
       },
       include: INVOICE_INCLUDE,
     });
@@ -191,6 +193,7 @@ export async function toInvoiceDTO(invoice: InvoiceWithRelations): Promise<Invoi
     clientEmail: invoice.clientEmail,
     editedAt: invoice.editedAt?.toISOString() ?? null,
     source: invoice.source,
+    testMode: invoice.testMode,
     reference: invoice.reference,
     metadata: (invoice.metadata as Record<string, string> | null) ?? null,
     expiresAt: invoice.expiresAt?.toISOString() ?? null,
@@ -249,6 +252,7 @@ export async function toPublicInvoiceDTO(
     createdAt: invoice.createdAt.toISOString(),
     creatorName: invoice.creator.displayName ?? "A PetraPay creator",
     linkId: invoice.linkId,
+    testMode: invoice.testMode,
     successUrl: invoice.successUrl,
     cancelUrl: invoice.cancelUrl,
     expiresAt: invoice.expiresAt?.toISOString() ?? null,

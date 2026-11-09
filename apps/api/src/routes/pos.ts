@@ -50,11 +50,12 @@ const saleSchema = z.object({
 
 // ---------- DTOs ----------
 
-export type PosDeviceDTO = { id: string; name: string; createdAt: string; lastSeenAt: string | null; sales: number };
+export type PosDeviceDTO = { id: string; name: string; testMode: boolean; createdAt: string; lastSeenAt: string | null; sales: number };
 
 const toDeviceDTO = (d: PosDevice & { _count?: { sales: number } }): PosDeviceDTO => ({
   id: d.id,
   name: d.name,
+  testMode: d.testMode,
   createdAt: d.createdAt.toISOString(),
   lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
   sales: d._count?.sales ?? 0,
@@ -76,6 +77,7 @@ async function toSaleDTO(invoice: Invoice & { swaps: Swap[] }, withQr = false) {
     amount: invoice.amount.toString(),
     currency: invoice.currency,
     note: invoice.title,
+    testMode: invoice.testMode,
     checkoutUrl: url,
     qrDataUrl: withQr ? await QRCode.toDataURL(url, { margin: 1, width: 520, errorCorrectionLevel: "M" }) : null,
     paidWith: via && token ? { symbol: token.symbol, chain: token.blockchain, amount: via.amountInFormatted } : null,
@@ -113,6 +115,15 @@ export async function posDashboardRoutes(app: FastifyInstance) {
       orderBy: { createdAt: "desc" },
     });
     return devices.map(toDeviceDTO);
+  });
+
+  /** Test mode: this terminal's sales can be paid with a simulated payment, for trying the flow without funds. */
+  app.patch<{ Params: { id: string } }>("/pos-devices/:id", async (req) => {
+    const { testMode } = parseBody(z.object({ testMode: z.boolean() }), req);
+    const device = await prisma.posDevice.findFirst({ where: { id: req.params.id, creatorId: creatorOf(req).id, revokedAt: null } });
+    if (!device) throw notFound("Terminal not found");
+    const updated = await prisma.posDevice.update({ where: { id: device.id }, data: { testMode }, include: { _count: { select: { sales: true } } } });
+    return toDeviceDTO(updated);
   });
 
   app.delete<{ Params: { id: string } }>("/pos-devices/:id", async (req) => {
@@ -169,6 +180,7 @@ export async function terminalRoutes(app: FastifyInstance) {
       return {
         merchantName: creator.displayName ?? "My store",
         deviceName: device.name,
+        testMode: device.testMode,
         canAcceptPayments: total > 0,
         freshAddresses: fresh,
         checkoutBase: env.APP_ORIGIN,
@@ -200,6 +212,7 @@ export async function terminalRoutes(app: FastifyInstance) {
         metadata: key ? { posKey: key } : null,
         expiresAt: new Date(Date.now() + SALE_TTL_MS),
         posDeviceId: device.id,
+        testMode: device.testMode,
       });
       void emitCheckoutEvent(invoice.id, "checkout.created");
       reply.status(201);

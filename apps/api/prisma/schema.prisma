@@ -140,6 +140,8 @@ model Invoice {
   cancelUrl         String?
   /// After this, no new quotes are issued and the checkout becomes EXPIRED.
   expiresAt         DateTime?
+  /// A test sale (from a terminal in test mode): can be paid with a simulated payment and is left out of totals.
+  testMode          Boolean         @default(false)
   /// The point-of-sale terminal that rang up this sale.
   posDeviceId       String?
   posDevice         PosDevice?      @relation(fields: [posDeviceId], references: [id], onDelete: SetNull)
@@ -351,6 +353,8 @@ model PosDevice {
   creatorId  String
   creator    Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   name       String
+  /// Sales from a test terminal are test sales: they can be paid with a simulated payment.
+  testMode   Boolean   @default(false)
   /// SHA-256 of the device token.
   tokenHash  String    @unique
   lastSeenAt DateTime?

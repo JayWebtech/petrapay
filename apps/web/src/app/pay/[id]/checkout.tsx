@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { DepositStep } from "./deposit-step";
 import { InvoicePanel } from "./invoice-panel";
 import { PaidState } from "./paid-state";
+import { TestPayment } from "./test-payment";
 import { ZecDirect } from "./zec-direct";
 
 const TERMINAL_FAIL = ["REFUNDED", "FAILED", "EXPIRED"];
@@ -75,7 +76,8 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
   const paid = invoice.status === "PAID" || swap?.status === "SUCCESS";
   const cancelled = invoice.status === "CANCELLED" && !swap;
   // Checkouts created through the API expire; one already being paid carries on.
-  const expired = !swap && (invoice.status === "EXPIRED" || (invoice.status === "OPEN" && !!invoice.expiresAt && Date.parse(invoice.expiresAt) <= now));
+  const expired =
+    !swap && (invoice.status === "EXPIRED" || (invoice.status === "OPEN" && !!invoice.expiresAt && Date.parse(invoice.expiresAt) <= now));
   const stage = resuming ? "resuming" : paid ? "paid" : cancelled ? "cancelled" : expired ? "expired" : swap ? "deposit" : view;
   const backToStore = invoice.cancelUrl ? () => window.location.assign(invoice.cancelUrl!) : undefined;
   const usd = invoiceUsd(invoice);
@@ -148,16 +150,19 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
       ) : stage === "zec" ? (
         <ZecDirect invoice={invoice} onBack={() => setView("choose")} />
       ) : (
-        <ChooseStep
-          payee={invoice.creatorName}
-          usd={usd}
-          tokens={tokens}
-          onPick={pick}
-          onBrowse={() => setSelectorOpen(true)}
-          onZec={() => setView("zec")}
-          onBack={backToStore}
-          backLabel={`Back to ${invoice.creatorName}`}
-        />
+        <>
+          {invoice.testMode && invoice.status === "OPEN" ? <TestPayment invoice={invoice} onPaid={setInvoice} /> : null}
+          <ChooseStep
+            payee={invoice.creatorName}
+            usd={usd}
+            tokens={tokens}
+            onPick={pick}
+            onBrowse={() => setSelectorOpen(true)}
+            onZec={() => setView("zec")}
+            onBack={backToStore}
+            backLabel={`Back to ${invoice.creatorName}`}
+          />
+        </>
       )}
     </CheckoutFrame>
   );

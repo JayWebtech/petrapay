@@ -98,6 +98,7 @@ export function InvoiceTable({ invoices, compact = false }: { invoices: InvoiceD
                   {inv.source === "API" || inv.source === "POS" ? (
                     <span className="rounded bg-[#eeecfd] px-1 font-sans text-[10px] font-semibold text-primary">{inv.source}</span>
                   ) : null}
+                  {inv.testMode ? <span className="rounded bg-[#fff1e6] px-1 font-sans text-[10px] font-semibold text-[#9a3f00]">TEST</span> : null}
                   {inv.reference ? <span className="truncate">{inv.reference}</span> : null}
                 </p>
               </td>

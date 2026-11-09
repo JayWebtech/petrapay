@@ -23,6 +23,7 @@ export function InvoicePanel({ invoice }: { invoice: PublicInvoiceDTO }) {
         {invoice.linkId ? "Payment" : `Invoice #${String(invoice.number).padStart(3, "0")}`}
         {invoice.dueDate ? <span>· Due {formatDate(invoice.dueDate, { month: "short", day: "numeric", year: "numeric" })}</span> : null}
         <InvoiceStatusBadge status={invoice.status} overdue={isOverdue(invoice)} />
+        {invoice.testMode ? <span className="rounded-md bg-[#fff1e6] px-1.5 py-0.5 text-[11px] font-semibold text-[#9a3f00]">TEST</span> : null}
       </p>
       <AmountHeading currency={invoice.currency} amount={invoice.amount} className="mt-3 sm:mt-4" />
       <p className="mt-2 text-base leading-snug text-pretty text-foreground/80 sm:mt-3 sm:text-lg">{invoice.title}</p>
