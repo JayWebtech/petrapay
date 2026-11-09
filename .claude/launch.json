@@ -73,6 +73,20 @@
         "3100"
       ],
       "port": 3100
+    },
+    {
+      "name": "ytech",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/mac/YTECHWEBSITE-REDESIGNED-REACT",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3200"
+      ],
+      "port": 3200
     }
   ]
 }
