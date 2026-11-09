@@ -2,6 +2,7 @@
   "name": "petrapay",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "description": "Privacy-first cross-chain invoicing for creators. Get paid in any token, settle to shielded ZEC.",
   "packageManager": "pnpm@9.15.9",
   "engines": {

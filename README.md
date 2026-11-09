@@ -140,3 +140,11 @@ Set the API's environment on the host (not in a committed file): `DATABASE_URL`,
 - Invoice content (title, line items) is readable by the server. A next step is encrypting it with a key carried in the link's URL fragment, so only the creator and the payer can read it.
 - Reusable payment links (tip jars, fixed-price products) and email/webhook notifications aren't built yet.
 - EVM "Pay with wallet" uses the injected provider (`window.ethereum`). Adding WalletConnect would cover mobile wallets.
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and report security issues privately as described there.
+
+## License
+
+[MIT](LICENSE) © 2026 Jethro Adamu
