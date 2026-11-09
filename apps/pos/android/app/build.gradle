@@ -85,7 +85,7 @@ android {
         versionCode 1
         versionName "1.0"
         // The PetraPay server terminals pair with; overridable per build (-PPETRAPAY_API_URL=…) and at pairing time.
-        buildConfigField "String", "PETRAPAY_API_URL", "\"${project.findProperty('PETRAPAY_API_URL') ?: 'https://petra-pay-zcash.vercel.app/api'}\""
+        buildConfigField "String", "PETRAPAY_API_URL", "\"${project.findProperty('PETRAPAY_API_URL') ?: 'https://api.petrapay.xyz'}\""
     }
     buildFeatures {
         buildConfig true

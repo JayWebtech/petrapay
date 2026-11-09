@@ -3,6 +3,8 @@
 import { formatAmount, formatUsd, type InvoiceDTO } from "@petrapay/shared";
 import {
   ArrowUpRight,
+  BookOpen,
+  ExternalLink,
   ChevronsUpDown,
   CodeXml,
   FileText,
@@ -76,6 +78,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       { id: "api-keys", label: "Create API key", group: "Actions", icon: CodeXml, onSelect: go("/dashboard/developers") },
       ...NAV.map((n) => ({ id: `nav-${n.href}`, label: `Go to ${n.label}`, group: "Navigation", icon: n.icon, onSelect: go(n.href) })),
       { id: "nav-settings", label: "Go to Settings", group: "Navigation", icon: Settings, onSelect: go("/dashboard/settings") },
+      { id: "nav-docs", label: "Open docs", group: "Navigation", icon: BookOpen, hint: "↗", onSelect: () => window.open("/docs", "_blank", "noopener") },
       ...invoices.slice(0, 30).map((inv) => ({
         id: `inv-${inv.id}`,
         label: `#${String(inv.number).padStart(3, "0")} ${inv.title}`,
@@ -276,6 +279,17 @@ function SidebarContents({
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Payments land in your Orchard wallet. PetraPay never holds funds.</p>
         </div>
+        <a
+          href="/docs"
+          target="_blank"
+          rel="noopener"
+          onClick={onNavigate}
+          className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-[#4a4860] transition-colors hover:bg-[#f0eff6] hover:text-foreground"
+        >
+          <BookOpen className="size-4" />
+          <span className="flex-1">Docs</span>
+          <ExternalLink className="size-3.5 text-muted-foreground" />
+        </a>
         <Link
           href="/dashboard/settings"
           onClick={onNavigate}

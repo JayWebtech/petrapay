@@ -22,13 +22,13 @@ npm start                      # Metro
 npm run android                # build and install on a connected device
 ```
 
-The server the terminal pairs with defaults to `https://petra-pay-zcash.vercel.app/api`. Override it per build with `-PPETRAPAY_API_URL=https://your-domain/api`, or change it on the pairing screen (for self-hosted PetraPay).
+The server the terminal pairs with defaults to `https://api.petrapay.xyz`. Override it per build with `-PPETRAPAY_API_URL=https://api.your-domain.com`, or change it on the pairing screen (for self-hosted PetraPay).
 
 ## Release build
 
 ```bash
 cd android
-./gradlew assembleRelease -PPETRAPAY_API_URL=https://your-domain/api
+./gradlew assembleRelease -PPETRAPAY_API_URL=https://api.your-domain.com
 # APK: android/app/build/outputs/apk/release/app-release.apk
 ```
 

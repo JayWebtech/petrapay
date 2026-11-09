@@ -14,7 +14,7 @@ const native = NativeModules.PetraDevice as Partial<DeviceConstants> | undefined
 export const device: DeviceConstants = {
   manufacturer: native?.manufacturer ?? 'Android',
   model: native?.model ?? 'POS',
-  apiBaseUrl: native?.apiBaseUrl ?? 'https://petra-pay-zcash.vercel.app/api',
+  apiBaseUrl: native?.apiBaseUrl ?? 'https://api.petrapay.xyz',
   isDebug: native?.isDebug ?? __DEV__,
 };
 

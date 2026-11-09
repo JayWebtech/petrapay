@@ -1,5 +1,5 @@
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from "@petrapay/shared";
-import { useSyncExternalStore } from "react";
+import { API_V1 } from "@/lib/public-config";
 
 export const EVENT_INFO: Record<WebhookEventType, string> = {
   "checkout.created": "A checkout was created: from your dashboard, the API, or a payment link.",
@@ -11,12 +11,9 @@ export const EVENT_INFO: Record<WebhookEventType, string> = {
 
 export { WEBHOOK_EVENT_TYPES };
 
-const noop = () => () => { };
-
-/** This deployment's public API base, e.g. https://pay.example.com/api/v1. */
+/** The public API base, e.g. https://api.petrapay.xyz/v1 (set NEXT_PUBLIC_API_ORIGIN to change it). */
 export function useApiBase(): string {
-
-  return `https://petrapay-production.up.railway.app/api/v1`;
+  return API_V1;
 }
 
 export function summarizeEvents(events: string[]): string {

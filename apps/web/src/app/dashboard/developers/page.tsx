@@ -28,7 +28,7 @@ export default function DevelopersPage() {
         title="Developers"
         description="Accept shielded payments on your own site: create a checkout from your server, send the customer to it, and get a webhook when it's paid."
         actions={
-          <Link href="/docs" target="_blank" className="btn-soft h-10 rounded-xl px-4 text-sm font-medium">
+          <Link href="/docs/api" target="_blank" className="btn-soft h-10 rounded-xl px-4 text-sm font-medium">
             <BookOpen className="size-4" /> API docs
           </Link>
         }
