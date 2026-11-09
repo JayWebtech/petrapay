@@ -15,6 +15,7 @@ import { useTokens } from "@/hooks/use-tokens";
 import { api, errorMessage } from "@/lib/api";
 import { sealFor, type SealedResponses } from "@/lib/box";
 import { DetailsStep } from "./details-step";
+import { amountError, sanitizeAmount } from "./validate";
 import { LinkPanel } from "./link-panel";
 
 type Step = "details" | "choose" | "review";
@@ -24,14 +25,17 @@ type Step = "details" | "choose" | "review";
  * picks how to pay, and only then is an invoice created for them. From there the regular
  * invoice checkout at /pay/<id> takes over, which is also their receipt.
  */
-export function LinkCheckout({ link }: { link: PublicLinkDTO }) {
+export function LinkCheckout({ link, suggestedAmount }: { link: PublicLinkDTO; suggestedAmount?: string }) {
   const router = useRouter();
   const toast = useToast();
   const { tokens } = useTokens();
   const fixed = link.amountType === "FIXED";
-  const needsDetails = !fixed || link.fields.length > 0;
+  // A valid suggested amount fills in a pay-what-you-want link, so the payer can skip straight to paying.
+  const suggested = !fixed && suggestedAmount ? sanitizeAmount(suggestedAmount, link.currency) : "";
+  const prefilled = !!suggested && amountError(link, suggested) === null;
+  const needsDetails = (!fixed && !prefilled) || link.fields.length > 0;
   const [step, setStep] = useState<Step>(needsDetails ? "details" : "choose");
-  const [amount, setAmount] = useState(fixed ? link.amount! : "");
+  const [amount, setAmount] = useState(fixed ? link.amount! : prefilled ? suggested : "");
   const [values, setValues] = useState<Record<string, string>>({});
   const [token, setToken] = useState<TokenDTO | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -120,7 +124,7 @@ export function LinkCheckout({ link }: { link: PublicLinkDTO }) {
           onPick={pick}
           onBrowse={() => setSelectorOpen(true)}
           onZec={payWithZec}
-          onBack={needsDetails ? () => setStep("details") : undefined}
+          onBack={needsDetails || !fixed ? () => setStep("details") : undefined}
           zecPending={zecPending}
         />
       )}

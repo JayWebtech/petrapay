@@ -20,9 +20,11 @@ export async function generateMetadata({ params }: PageProps<"/l/[id]">): Promis
   };
 }
 
-export default async function LinkPage({ params }: PageProps<"/l/[id]">) {
+export default async function LinkPage({ params, searchParams }: PageProps<"/l/[id]">) {
   const { id } = await params;
+  // Sites can suggest an amount for pay-what-you-want links, e.g. /l/abc?amount=25 from the npm package.
+  const { amount } = await searchParams;
   const link = await load(id);
   if (!link) notFound();
-  return <LinkCheckout link={link} />;
+  return <LinkCheckout link={link} suggestedAmount={typeof amount === "string" ? amount : undefined} />;
 }

@@ -4,20 +4,49 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@petrapay/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@petrapay/web",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@petrapay/api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@petrapay/api",
+        "dev"
+      ],
       "port": 4000
     },
     {
       "name": "api-local",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["DATABASE_URL=postgresql://petrapay@localhost:5440/petrapay", "APP_ORIGIN=http://localhost:3000", "COOKIE_SECURE=false", "WORKER_ENABLED=false", "pnpm", "--filter", "@petrapay/api", "dev"],
+      "runtimeArgs": [
+        "DATABASE_URL=postgresql://petrapay@localhost:5440/petrapay",
+        "APP_ORIGIN=http://localhost:3000",
+        "COOKIE_SECURE=false",
+        "WORKER_ENABLED=false",
+        "pnpm",
+        "--filter",
+        "@petrapay/api",
+        "dev"
+      ],
       "port": 4000
+    },
+    {
+      "name": "sdk-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5500",
+        "--directory",
+        "/private/tmp/claude-501/-Users-mac-petrapay/cc1b06e1-e86d-4884-a1e3-52f73c64246f/scratchpad/sdkdemo"
+      ],
+      "port": 5500
     }
   ]
 }

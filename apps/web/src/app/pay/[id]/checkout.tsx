@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChooseStep } from "@/components/app/checkout/choose-step";
 import { CheckoutFrame } from "@/components/app/checkout/frame";
 import { ReviewStep } from "@/components/app/checkout/review-step";
+import { notifyOpener } from "@/components/app/checkout/embed";
 import { paymentKey, rememberPayment } from "@/components/app/checkout/storage";
 import { StepHeader, estimateIn, invoiceUsd } from "@/components/app/checkout/utils";
 import { useNow } from "@/components/app/countdown";
@@ -79,6 +80,15 @@ export function Checkout({ initial, initialView = "choose" }: { initial: PublicI
   const expired =
     !swap && (invoice.status === "EXPIRED" || (invoice.status === "OPEN" && !!invoice.expiresAt && Date.parse(invoice.expiresAt) <= now));
   const stage = resuming ? "resuming" : paid ? "paid" : cancelled ? "cancelled" : expired ? "expired" : swap ? "deposit" : view;
+  // Tell a site that opened this checkout in a popup (the `petrapay` npm package) how it's going.
+  const swapStarted = !!swap && swap.status !== "PENDING_DEPOSIT" && !TERMINAL_FAIL.includes(swap.status);
+  useEffect(() => {
+    const payload = { checkoutId: invoice.id, linkId: invoice.linkId, status: invoice.status, amount: invoice.amount, currency: invoice.currency };
+    if (invoice.status === "OPEN" && !paid) notifyOpener("payment.created", payload);
+    if (!paid && (invoice.status === "PROCESSING" || swapStarted)) notifyOpener("payment.processing", { ...payload, status: "PROCESSING" });
+    if (paid) notifyOpener("payment.paid", { ...payload, status: "PAID" });
+  }, [invoice.id, invoice.linkId, invoice.status, invoice.amount, invoice.currency, paid, swapStarted]);
+
   const backToStore = invoice.cancelUrl ? () => window.location.assign(invoice.cancelUrl!) : undefined;
   const usd = invoiceUsd(invoice);
 
