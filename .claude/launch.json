@@ -47,6 +47,32 @@
         "/private/tmp/claude-501/-Users-mac-petrapay/cc1b06e1-e86d-4884-a1e3-52f73c64246f/scratchpad/sdkdemo"
       ],
       "port": 5500
+    },
+    {
+      "name": "poultrix-landing",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5501",
+        "--directory",
+        "/Users/mac/poultrix/landingpage"
+      ],
+      "port": 5501
+    },
+    {
+      "name": "keri-premier",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "/Users/mac/boomba",
+        "exec",
+        "next",
+        "dev",
+        "--port",
+        "3100"
+      ],
+      "port": 3100
     }
   ]
 }
