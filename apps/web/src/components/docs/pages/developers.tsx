@@ -554,3 +554,126 @@ export function Testing() {
     </>
   );
 }
+
+export function Sdk() {
+  return (
+    <>
+      <P>
+        The <C>petrapay</C> package adds a <strong>Pay with PetraPay</strong> button to any website. It opens the hosted checkout in a popup, so
+        customers never leave your page, and tells your page when they&apos;ve paid. No API key is needed in the browser.
+      </P>
+
+      <H2>1. Create a payment link</H2>
+      <P>
+        In <A href="/dashboard/links">Payment links</A>, create a link and copy its id: the part after <C>/l/</C>. Choose{" "}
+        <strong>Customer chooses</strong> pricing if your site passes the amount (a cart total, for example), or <strong>Fixed price</strong> for a
+        single product.
+      </P>
+
+      <H2>2. Add the button</H2>
+      <H3>React and Next.js</H3>
+      <Code samples={[{ label: "Terminal", code: "npm install petrapay" }]} />
+      <Code
+        samples={[
+          {
+            label: "Checkout.tsx",
+            code: `import { PetraPayButton } from "petrapay/react";
+
+export function Checkout({ total }: { total: number }) {
+  return (
+    <PetraPayButton
+      paymentId="YOUR_LINK_ID"
+      amount={total}
+      onSuccess={(payment) => console.log("Paid", payment.checkoutId)}
+    />
+  );
+}`,
+          },
+          {
+            label: "Your own button",
+            code: `import { usePetraPay } from "petrapay/react";
+
+const { open, status } = usePetraPay({
+  paymentId: "YOUR_LINK_ID",
+  onSuccess: (payment) => markPaid(payment.checkoutId),
+});
+
+<button onClick={() => open({ amount: cart.total })}>Pay with crypto</button>;`,
+          },
+        ]}
+      />
+      <H3>Plain HTML</H3>
+      <Code
+        samples={[
+          {
+            label: "HTML",
+            code: `<script src="https://unpkg.com/petrapay@0.1/dist/petrapay.global.js"></script>
+
+<petrapay-button payment-id="YOUR_LINK_ID" amount="25"></petrapay-button>
+
+<script>
+  document.querySelector("petrapay-button").addEventListener("petrapay:success", (e) => {
+    console.log("Paid", e.detail.checkoutId);
+  });
+</script>`,
+          },
+          {
+            label: "Vanilla JS",
+            code: `import { openCheckout } from "petrapay";
+
+payButton.addEventListener("click", () => {
+  openCheckout({ paymentId: "YOUR_LINK_ID", amount: 25, onSuccess: (p) => console.log(p) });
+});`,
+          },
+          {
+            label: "Expo",
+            code: `import * as WebBrowser from "expo-web-browser";
+import { checkoutUrl } from "petrapay";
+
+await WebBrowser.openBrowserAsync(checkoutUrl({ paymentId: "YOUR_LINK_ID", amount: 25 }));`,
+          },
+        ]}
+      />
+      <Callout type="tip">
+        Call <C>openCheckout</C> straight from a click handler. Browsers block popups opened later; if that happens, the checkout opens in the same tab
+        instead.
+      </Callout>
+
+      <H2>Options</H2>
+      <Params>
+        <Param name="paymentId" type="string" required>
+          A payment link id, or a checkout id with <C>type: &quot;checkout&quot;</C>.
+        </Param>
+        <Param name="type" type='"link" | "checkout"'>
+          Default <C>link</C>. Use <C>checkout</C> for checkouts you <A href="/docs/api/checkouts">create with the API</A>.
+        </Param>
+        <Param name="amount" type="string | number">
+          Fills in the amount on pay-what-you-want links, so the customer goes straight to paying. Ignored for fixed-price links.
+        </Param>
+        <Param name="mode" type='"popup" | "redirect" | "tab"'>
+          Default <C>popup</C>.
+        </Param>
+        <Param name="overlay" type="boolean">
+          Dims your page with a &quot;finish paying in the PetraPay window&quot; notice while the popup is open. Default <C>true</C>.
+        </Param>
+        <Param name="autoClose" type="number | false">
+          Closes the popup this many milliseconds after payment. Default <C>2500</C>.
+        </Param>
+        <Param name="onCreated, onProcessing, onSuccess" type="(payment) => void">
+          Called as the payment progresses. <C>payment</C> is <C>{`{ checkoutId, linkId, status, amount, currency }`}</C>.
+        </Param>
+        <Param name="onClose" type="({ paid, last }) => void">
+          The popup was closed.
+        </Param>
+        <Param name="label, theme, size, block" type="button">
+          Button text, <C>dark</C> or <C>light</C>, <C>small</C> / <C>medium</C> / <C>large</C>, and full width.
+        </Param>
+      </Params>
+
+      <Callout type="warning" title="Confirm payments on your server">
+        <C>onSuccess</C> runs in the customer&apos;s browser, so use it to update your page. Before shipping an order or granting access, confirm the
+        payment with a <A href="/docs/webhooks">webhook</A> or by <A href="/docs/api/checkouts#retrieve-a-checkout">fetching the checkout</A>.
+      </Callout>
+    </>
+  );
+}

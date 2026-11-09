@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import type { ComponentType } from "react";
 import { ALL_PAGES, docHref, findPage } from "@/components/docs/nav";
 import { Checkout, Invoices, PaymentLinks, PointOfSale, Withdrawals } from "@/components/docs/pages/accept";
-import { ApiCheckouts, ApiOverview, ApiPaymentLinks, Testing, WebhookSignatures, Webhooks } from "@/components/docs/pages/developers";
+import { ApiCheckouts, ApiOverview, ApiPaymentLinks, Sdk, Testing, WebhookSignatures, Webhooks } from "@/components/docs/pages/developers";
 import { Concepts, Introduction, Quickstart } from "@/components/docs/pages/getting-started";
 import { Fees, Faq, Privacy, SelfHosting } from "@/components/docs/pages/resources";
 import { TableOfContents } from "@/components/docs/shell";
@@ -19,6 +19,7 @@ const CONTENT: Record<string, ComponentType> = {
   checkout: Checkout,
   "point-of-sale": PointOfSale,
   withdrawals: Withdrawals,
+  sdk: Sdk,
   api: ApiOverview,
   "api/checkouts": ApiCheckouts,
   "api/payment-links": ApiPaymentLinks,

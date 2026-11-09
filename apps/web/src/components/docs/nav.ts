@@ -35,6 +35,7 @@ export const DOCS: DocGroup[] = [
   {
     title: "Developers",
     pages: [
+      { slug: "sdk", title: "Pay button (npm)", description: "Add a Pay with PetraPay button to any website with the petrapay package.", keywords: ["npm", "react", "button", "javascript", "embed", "popup", "sdk", "plugin"] },
       { slug: "api", title: "API overview", description: "Base URL, authentication, errors, idempotency and pagination.", keywords: ["rest", "key", "auth", "errors"] },
       { slug: "api/checkouts", title: "Checkouts", description: "Create a hosted payment page from your server and track its status.", keywords: ["create checkout", "order"] },
       { slug: "api/payment-links", title: "Payment links API", description: "Create, list and pause payment links programmatically." },
