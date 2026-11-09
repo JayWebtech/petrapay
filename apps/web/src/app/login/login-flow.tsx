@@ -161,7 +161,7 @@ function Create({ onBack, onDone }: { onBack: () => void; onDone: () => void }) 
       <BackButton onClick={onBack} />
       <h1 className="text-2xl font-semibold tracking-tight">Save your recovery phrase</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        These 12 words are your account. PetraPay can&apos;t recover them for you. Write them down or store them in a password manager.
+        These 12 words are your account. PetraPay can&apos;t recover them for you. Write them down or store them in a password manager. You can view them again later in Settings on this device.
       </p>
       <div className="card mt-6 p-4">
         <ol className="grid grid-cols-3 gap-2">

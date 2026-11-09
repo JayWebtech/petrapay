@@ -1,5 +1,5 @@
 # PetraPay
-Video Demo: [https://vimeo.com/1240765085?share=copy&fl=sv&fe=ci](https://vimeo.com/1240767672?share=copy&fl=sv&fe=ci)
+Video Demo: [https://vimeo.com/1245079217?share=copy&fl=sv&fe=ci](https://vimeo.com/1245079217?share=copy&fl=sv&fe=ci)
 
 Privacy-first, cross-chain invoicing for creators. A freelancer sends a payment link; the client pays with whatever they hold (USDC on Base, SOL, ETH, BTC, USDT on Tron and 100+ other assets); 
 
@@ -12,9 +12,9 @@ Client wallet ──(USDC on Base)──▶ 1Click deposit address ──▶ NEA
 
 ## Demo
 
-[![Watch the PetraPay demo](https://vumbnail.com/1240767672.jpg)](https://vimeo.com/1240767672)
+[![Watch the PetraPay demo](https://vumbnail.com/1245079217.jpg)](https://vimeo.com/1245079217)
 
-▶️ **[Watch the full demo on Vimeo →](https://vimeo.com/1240767672)**
+▶️ **[Watch the full demo on Vimeo →](https://vimeo.com/1245079217)**
 
 ## Features
 

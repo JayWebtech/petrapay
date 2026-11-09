@@ -8,6 +8,7 @@ import { useAuth } from "@/components/app/auth-provider";
 import { CopyButton } from "@/components/app/copy-button";
 import { PageHeader } from "@/components/app/dash/ui";
 import { TextField } from "@/components/app/field";
+import { RecoveryPhraseCard } from "@/components/app/settings/recovery-phrase";
 import { useToast } from "@/components/app/toaster";
 import { Button, StatefulButton, type ButtonState } from "@/components/motion/button";
 import { useApi } from "@/hooks/use-api";
@@ -73,6 +74,8 @@ export default function SettingsPage() {
           <CopyButton value={me.publicKey} label="Copy public key" />
         </div>
       </section>
+
+      <RecoveryPhraseCard />
 
       <section className="card p-5">
         <div className="flex items-center gap-2 text-sm font-medium">

@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@petrapay/api", "dev"],
       "port": 4000
+    },
+    {
+      "name": "api-local",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["DATABASE_URL=postgresql://petrapay@localhost:5440/petrapay", "APP_ORIGIN=http://localhost:3000", "COOKIE_SECURE=false", "WORKER_ENABLED=false", "pnpm", "--filter", "@petrapay/api", "dev"],
+      "port": 4000
     }
   ]
 }

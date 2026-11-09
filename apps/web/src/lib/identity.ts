@@ -12,8 +12,9 @@ import { fromBase64Url, openSealed, toBase64Url } from "./box";
  *   - an ed25519 signing key (the account), and
  *   - an AES-GCM "notes" key that encrypts private fields (like client names) before upload, and
  *   - an X25519 "box" key pair: payers seal payment-link form answers to its public half.
- * The phrase is shown once and never leaves the browser. On this device both keys are kept as
- * non-extractable WebCrypto keys in IndexedDB, so page scripts can use them but can't read them.
+ * The phrase never leaves the browser. On this device the keys are kept as non-extractable
+ * WebCrypto keys in IndexedDB, so page scripts can use them but can't read them. A copy of the
+ * phrase is kept encrypted under its own non-extractable key so it can be shown again in Settings.
  * Browsers without WebCrypto Ed25519 fall back to storing the raw signing key in IndexedDB.
  */
 
@@ -29,6 +30,8 @@ type StoredIdentity = ({ kind: "webcrypto"; publicKey: string; privateKey: Crypt
   notesKey?: CryptoKey;
   /** Absent on devices set up before payment links existed. `key` is raw hex where WebCrypto lacks X25519. */
   box?: { publicKey: string; key: CryptoKey | string };
+  /** The recovery phrase, encrypted with a non-extractable key, so Settings can show it again. Absent on older devices. */
+  phrase?: { key: CryptoKey; iv: Uint8Array; ct: Uint8Array };
 };
 
 export function createRecoveryPhrase(): string {
@@ -133,9 +136,13 @@ export async function saveIdentity(phrase: string): Promise<string> {
   const boxSecret = boxSecretFromPhrase(phrase);
   const boxPublic = x25519.getPublicKey(boxSecret);
   const box = { publicKey: bytesToHex(boxPublic), key: (await importBoxKey(boxSecret, boxPublic)) ?? bytesToHex(boxSecret) };
+  const phraseKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, phraseKey, utf8ToBytes(normalizePhrase(phrase))));
+  const stored = { key: phraseKey, iv, ct };
   const record: StoredIdentity = privateKey
-    ? { kind: "webcrypto", publicKey, privateKey, notesKey, box }
-    : { kind: "raw", publicKey, secretKey: bytesToHex(secret), notesKey, box };
+    ? { kind: "webcrypto", publicKey, privateKey, notesKey, box, phrase: stored }
+    : { kind: "raw", publicKey, secretKey: bytesToHex(secret), notesKey, box, phrase: stored };
   await idb("readwrite", (s) => s.put(record, KEY_ID));
   secret.fill(0);
   notesSecret.fill(0);
@@ -150,6 +157,35 @@ export async function loadIdentity(): Promise<StoredIdentity | null> {
   } catch {
     return null;
   }
+}
+
+/** The recovery phrase saved on this device, or null if it was set up before phrases were kept. */
+export async function revealPhrase(): Promise<string | null> {
+  const identity = await loadIdentity();
+  if (!identity?.phrase) return null;
+  try {
+    const { key, iv, ct } = identity.phrase;
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv) }, key, new Uint8Array(ct));
+    const phrase = new TextDecoder().decode(pt);
+    // Only return it if it still matches this device's account.
+    return publicKeyFromPhrase(phrase) === identity.publicKey ? phrase : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function hasSavedPhrase(): Promise<boolean> {
+  return !!(await loadIdentity())?.phrase;
+}
+
+/** Removes the saved phrase from this device. The account keys stay, so you stay signed in. */
+export async function forgetSavedPhrase(): Promise<void> {
+  const identity = await loadIdentity();
+  if (!identity?.phrase) return;
+  const rest: StoredIdentity = { ...identity };
+  delete rest.phrase;
+  await idb("readwrite", (s) => s.put(rest, KEY_ID));
+  identityChanged();
 }
 
 export async function forgetIdentity(): Promise<void> {

@@ -81,7 +81,7 @@ export function DocsShell({ children }: { children: ReactNode }) {
             <Link href="/dashboard" className="hidden h-9 items-center rounded-xl px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground sm:inline-flex">
               Dashboard
             </Link>
-            <Link href="/login" className="btn-solid h-9 rounded-xl px-3.5 text-sm font-semibold">
+            <Link href="/login" className="btn-solid h-9 rounded-xl px-3.5 text-sm font-semibold whitespace-nowrap">
               Get started
             </Link>
           </div>

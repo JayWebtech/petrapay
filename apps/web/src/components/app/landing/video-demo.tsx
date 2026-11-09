@@ -4,7 +4,7 @@ import { Play } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useRef, useState } from "react";
 
-const VIMEO_ID = "1240767672";
+const VIMEO_ID = "1245079217";
 
 /**
  * Full-width video demo section. Shows a cinematic thumbnail with a play
